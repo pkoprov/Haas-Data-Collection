@@ -2,10 +2,11 @@ import telnetlib, json
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
-mqttBroker = "broker.hivemq.com"
+mqttBroker = "localhost"
+port = 1883
 
-client = mqtt.Client("Machine1")
-client.connect(mqttBroker)
+client = mqtt.Client("VF-2_1")
+client.connect(mqttBroker, port)
 
 #change the IP address if needed
 HOST='192.168.1.20'

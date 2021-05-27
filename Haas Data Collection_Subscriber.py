@@ -53,10 +53,11 @@ def on_message(client, userdata, message):
         print(error)
 
 #MAIN
-mqttBroker = "broker.hivemq.com"
+mqttBroker = "localhost"
+port = 1883
 
-client = mqtt.Client("PC 1")
-client.connect(mqttBroker)
+client = mqtt.Client("Subscriber")
+client.connect(mqttBroker, port)
 
 #call-back functions
 client.on_connect = on_connect
