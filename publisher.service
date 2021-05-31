@@ -3,7 +3,7 @@ Description=Haas Data Publisher
 
 [Service]
 ExecStart=/usr/bin/python3 -u Publisher.py
-WorkingDirectory=Haas-Data-Collection
+WorkingDirectory=/home/pi/Haas-Data-Collection
 Restart=on-failure
 RestartSec=40s
 User=pi
