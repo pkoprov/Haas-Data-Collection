@@ -1,4 +1,5 @@
 import telnetlib, json
+import time
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
@@ -65,3 +66,4 @@ while True:
     client.publish("HaasData", jsondata, qos=0)
 
     print("Data published in topic {}".format(topic), data)
+    time.sleep(1)
