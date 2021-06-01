@@ -19,6 +19,7 @@ with open("/home/pi/Haas-Data-Collection/Pub_config.txt") as config:
     client = config.readline().split(" = ")[1].replace("\n","")
     CNC_host = config.readline().split(" = ")[1].replace("\n","")
 
+topic = client
 CNC_port = 5051
 MQTT_port = 1883
 
@@ -61,6 +62,6 @@ while True:
             data[msg[0]] = msg[1]
 
     jsondata = json.dumps(data)
-    client.publish(client, jsondata, qos=0)
+    client.publish("HaasData", jsondata, qos=0)
 
-    print("Data published in topic {}".format(client), data)
+    print("Data published in topic {}".format(topic), data)
