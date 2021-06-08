@@ -1,19 +1,22 @@
-import getpass
 import telnetlib
+import pandas as pd
 
-HOST = "localhost"
-user = input("Enter your remote account: ")
-password = getpass.getpass()
+CNC_host = "169.254.242.1"
+CNC_port = 5051
+tn = telnetlib.Telnet(CNC_host, CNC_port)
+Q_codes = pd.read_excel("./Haas-Data-Collection/Q-codes.xlsx", sheet_name="Global")
+Q_codes = Q_codes.append(pd.read_excel("./Haas-Data-Collection/Q-codes.xlsx",sheet_name="Macros"), ignore_index = True)
 
-tn = telnetlib.Telnet(HOST)
+macros_dict = {}
 
-tn.read_until(b"login: ")
-tn.write(user.encode('ascii') + b"\n")
-if password:
-    tn.read_until(b"Password: ")
-    tn.write(password.encode('ascii') + b"\n")
+for n, i in enumerate(Q_codes["Variable"]):
+    msg = i.encode("ascii")+b"\n"
+    tn.write(msg)
 
-tn.write(b"ls\n")
-tn.write(b"exit\n")
+out = tn.read_until(msg,0.5).decode("utf-8").replace(">",'').replace("\r\n","|").split("|")
+out.pop(-1)
 
-print(tn.read_all().decode('ascii'))
+for n, value in enumerate(out):
+    val_list = value.split(", ")
+    if value[1] != "?":
+        macros_dict[Q_codes["Description"][n]] = val_list[1]

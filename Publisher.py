@@ -1,17 +1,10 @@
-import telnetlib, json
-import time
-from datetime import datetime
+import telnetlib, json, time
 import paho.mqtt.client as mqtt
+import pandas as pd
 
+Q_codes = pd.read_excel("./Haas-Data-Collection/Q-codes.xlsx", sheet_name="Global")
+Q_codes = Q_codes.append(pd.read_excel("./Haas-Data-Collection/Q-codes.xlsx",sheet_name="Macros"), ignore_index = True)
 
-msg1 = b"?Q100" + b'\n'  # SERIAL NUMBER
-msg2 = b"?Q101" + b'\n'  # SOFTWARE VERSION
-msg3 = b"?Q102" + b'\n'  # MODEL
-msg4 = b"?Q600 3027" + b'\n'  # Spindle RPM
-msg5 = b"?Q600 5021" + b'\n'  # Present Machine Coordinate Position X
-msg6 = b"?Q600 5022" + b'\n'  # Present Machine Coordinate Position Y
-msg7 = b"?Q600 5023" + b'\n'  # Present Machine Coordinate Position Z
-message = [msg1, msg2, msg3, msg4, msg5, msg6, msg7]
 
 # read data specific to setup and machines
 with open("/home/pi/Haas-Data-Collection/Pub_config.txt") as config:
@@ -21,6 +14,7 @@ with open("/home/pi/Haas-Data-Collection/Pub_config.txt") as config:
     CNC_host = config.readline().split(" = ")[1].replace("\n","")
 
 topic = client
+# topic = "HaasData"
 CNC_port = 5051
 MQTT_port = 1883
 
@@ -31,39 +25,22 @@ tn = telnetlib.Telnet(CNC_host, CNC_port)
 
 
 while True:
-    data ={}
+    data = {}
 
-    now = datetime.now()
-    total_time = (now.hour * 3600) + (now.minute * 60) + (now.second)
-    date = datetime.now().date()
-    data["date"] = str(date)
-    data["seconds"] = total_time
-
-    # send all the Q codes
-    for msg in message:
+    for n, i in enumerate(Q_codes["Variable"]):
+        msg = i.encode("ascii") + b"\n"
         tn.write(msg)
 
-    # read and parse the message
-    out = tn.read_until(msg,0.5).decode("utf-8").replace(">","").replace("\r\n","|").split("|")
+    out = tn.read_until(msg, 0.5).decode("utf-8").replace(">", '').replace("\r\n", "|").split("|")
+    out.pop(-1)
 
-    # create dictionary with all the data
-    for n, msg in enumerate(out):
-        msg = msg.split(", ")
-        if n == 3:
-            data["RPM"] = float(msg[1])
-        elif n == 4:
-            data["X"] = float(msg[1])
-        elif n == 5:
-            data["Y"] = float(msg[1])
-        elif n == 6:
-            data["Z"] = float(msg[1])
-        elif len(msg)<=1:
-            pass
-        else:
-            data[msg[0]] = msg[1]
+    for n, value in enumerate(out):
+        val_list = value.split(", ")
+        if value[1] != "?":
+            data[Q_codes["Description"][n]] = val_list[1]
 
     jsondata = json.dumps(data)
-    client.publish("HaasData", jsondata, qos=0)
+    client.publish(topic, jsondata, qos=0)
 
-    print("Data published in topic {}".format(topic), data)
+    print("Data published in topic {}".format(topic))
     time.sleep(1)

@@ -1,3 +1,5 @@
-Plan.pdf
+*.pdf
 test.py
+*.log
+*.dwg
 *.log
