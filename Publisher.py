@@ -14,8 +14,8 @@ with open("/home/pi/Haas-Data-Collection/Pub_config.txt") as config:
     client = config.readline().split(" = ")[1].replace("\n","")
     CNC_host = config.readline().split(" = ")[1].replace("\n","")
 
-topic = client
-# topic = "HaasData"
+# topic = client
+topic = "HaasData"
 CNC_port = 5051
 MQTT_port = 1883
 
@@ -41,9 +41,9 @@ while True:
 
     # fill the dictionary with data
     for n, msg in enumerate(out):
-        val_list = msg.split(", ")  # split message into topic and value
-        if n == 12:
-            data["Status"] = msg
+        val_list = msg.split(", ")  # split message into variable and value
+        if n == 14:
+            data["Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"] = msg
             print(msg)
         elif val_list[1] != "?": # if value exists
             var = Q_codes["Description"][n]
