@@ -2,8 +2,9 @@ import telnetlib, json, time
 import paho.mqtt.client as mqtt
 import pandas as pd
 
-Q_codes = pd.read_excel("./Haas-Data-Collection/Global Q-codes.xlsx")
-Q_codes = Q_codes.append(pd.read_excel("./Haas-Data-Collection/Q-codes.xlsx"), ignore_index = True)
+# /home/pi/Haas-Data-Collection/
+Q_codes = pd.read_excel("/home/pi/Haas-Data-Collection/DB Table columns.xlsx",sheet_name="Static")
+Q_codes = Q_codes.append(pd.read_excel("/home/pi/Haas-Data-Collection/DB Table columns.xlsx",sheet_name="Variable"), ignore_index = True)
 
 
 # read data specific to setup and machines
@@ -25,6 +26,7 @@ tn = telnetlib.Telnet(CNC_host, CNC_port)
 
 
 while True:
+
     # dictionary for the future read from telnet
     data = {}
 
@@ -42,11 +44,11 @@ while True:
         val_list = msg.split(", ")  # split message into topic and value
         if n == 12:
             data["Status"] = msg
-            # print(msg)
+            print(msg)
         elif val_list[1] != "?": # if value exists
             var = Q_codes["Description"][n]
             data[var] = val_list[1]
-            # print(var, val_list[1])
+            print(var, val_list[1])
 
     jsondata = json.dumps(data)
     client.publish(topic, jsondata, qos=0)
