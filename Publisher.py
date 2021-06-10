@@ -44,11 +44,11 @@ while True:
         val_list = msg.split(", ")  # split message into variable and value
         if n == 14:
             data["Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"] = msg
-            print(msg)
+            # print(msg)
         elif val_list[1] != "?": # if value exists
             var = Q_codes["Description"][n]
             data[var] = val_list[1]
-            print(var, val_list[1])
+            # print(var, val_list[1])
 
     jsondata = json.dumps(data)
     client.publish(topic, jsondata, qos=0)
