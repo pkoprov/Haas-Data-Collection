@@ -27,7 +27,7 @@ tn = telnetlib.Telnet(CNC_host, CNC_port)
 
 while True:
 
-    # dictionary for the future read from telnet
+# dictionary for the future read from telnet
     data = {}
 
     # transform Q-codes from table to binary and send to the CNC machine
@@ -42,7 +42,7 @@ while True:
     # fill the dictionary with data
     for n, msg in enumerate(out):
         val_list = msg.split(", ")  # split message into variable and value
-        if n == 14:
+        if len(val_list) == 1 or len(val_list) == 5:
             data["Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"] = msg
             # print(msg)
         elif val_list[1] != "?": # if value exists
