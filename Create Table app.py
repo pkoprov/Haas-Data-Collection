@@ -14,7 +14,7 @@ except (Exception, pg.DatabaseError) as error:
     print(error)
 
 
-topic = input("Type the topic:  ")
+topic = input("Type the table name:  ")
 path = easygui.fileopenbox()
 sheet = input("Type the sheet name: ")
 while True:
