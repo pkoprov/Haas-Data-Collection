@@ -100,7 +100,7 @@ def row_insert(message):
 
 
 #MAIN
-mqttBroker = "192.168.10.2"
+mqttBroker = "192.168.10.101"
 port=1883
 client = mqtt.Client("Subscriber")
 client.connect(mqttBroker)
