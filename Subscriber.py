@@ -1,4 +1,4 @@
-import json, time
+import json
 import psycopg2 as pg
 import paho.mqtt.client as mqtt
 
@@ -40,8 +40,11 @@ def subscribe(state):
 def on_message(client, userdata, message):
     print("Received message:", message.topic)
     msg = message.payload.decode("utf-8")
+
     if msg == "start":
+
         subscribe(True)
+
     elif msg == 'stop':
         subscribe(False)
         # client.loop_stop()
@@ -55,8 +58,10 @@ def on_message(client, userdata, message):
         else:
             input("Incorrect input. Type 'y' or 'n': ")
     else:
+        print("Just started")
         dataObj=json.loads(msg)
         row_insert(dataObj)
+
 
 def row_insert(message):
     try:
@@ -67,8 +72,9 @@ def row_insert(message):
 
         # define into which table to insert
         for row in static_data:
-            if message["Machine Serial Number"] == row[2]:
-                table_name = row[0]
+            if message["Machine Serial Number"] == row[0]:
+                table_name = row[4]
+
 
         # read column names for the current table
         cur.execute(f'SELECT * FROM public."{table_name}"')

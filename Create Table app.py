@@ -1,6 +1,5 @@
 import psycopg2 as pg
 import pandas as pd
-import easygui
 
 
 db = "HaasDataCollection"
@@ -15,7 +14,7 @@ except (Exception, pg.DatabaseError) as error:
 
 
 topic = input("Type the table name:  ")
-path = easygui.fileopenbox()
+path = "DB Table columns.xlsx"
 sheet = input("Type the sheet name: ")
 while True:
     try:
