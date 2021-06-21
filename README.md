@@ -11,7 +11,7 @@ This is a code that runs on the RPI connected to the CNC machine and sends the d
 The **publisher.service** is included in github repo.
 ### [Pub_config.txt](Pub_config.txt)
 This file is used in the **Publisher.py**. It contains IP address of the CNC machine, IP address of the broker and the name of the machine. This file needs to be edited every time for each machine.
-### [DB Table columns.xlsx](DB Table columns.xlsx)
+### [DB Table columns.xlsx]('DB Table columns.xlsx')
 This table contains the commands and macros that are to be send to CNC machine to retrieve the data. Sheet "Static" contains the static data for the CNC machines and is used to create the asset table in the database. Sheets with variables for VF-2 and ST-10 contain the commands and macros for the data that varies depending on either time or the motion of machines. These sheets are used to create tables for every CNC machine that will be used to collect the data from.
 ### [Q-codes.py](Q-codes.py)
 Run this code to generate all the commands and macros that you have in the file **"Book of Macros.xlsx"**.
