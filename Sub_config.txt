@@ -1,0 +1,2 @@
+MQTT Broker IP = 192.168.10.2
+DataBase name = HaasDataCollection
