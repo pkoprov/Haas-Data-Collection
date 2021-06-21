@@ -9,17 +9,17 @@ This is a code that runs on the RPI connected to the CNC machine and sends the d
 `sudo cp /lib/systemd/system/publisher.service`
 
 The **publisher.service** is included in github repo.
-### Pub_config.txt
+### [Pub_config.txt](Pub_config.txt)
 This file is used in the **Publisher.py**. It contains IP address of the CNC machine, IP address of the broker and the name of the machine. This file needs to be edited every time for each machine.
-### DB Table columns.xlsx
+### [DB Table columns.xlsx](DB Table columns.xlsx)
 This table contains the commands and macros that are to be send to CNC machine to retrieve the data. Sheet "Static" contains the static data for the CNC machines and is used to create the asset table in the database. Sheets with variables for VF-2 and ST-10 contain the commands and macros for the data that varies depending on either time or the motion of machines. These sheets are used to create tables for every CNC machine that will be used to collect the data from.
-### Q-codes.py
+### [Q-codes.py](Q-codes.py)
 Run this code to generate all the commands and macros that you have in the file **"Book of Macros.xlsx"**.
-### Q-codes.xlsx
+### [Q-codes.xlsx](Q-codes.xlsx)
 The table that is created after running the **Q-codes.py**.
-### Create Table app.py
+### [Create Table app.py](Create Table app.py)
 This code creates the tables in PostgreSQL database. You must type the name of the tables (up to you how to call them) and type **Static** to create the asset table in the database. Furthermore, you have to type the name of the tables (up to you how to call them) and type names of the variable’s sheets from the **DB Table columns.xlsx** to create the tables for every CNC machine you are gathering the data from.
-### Subscriber.py
+### [Subscriber.py](Subscriber.py)
 This code runs the subscriber app that collects the data from the MQTT broker and makes row insertions to the PostgreSQL database. This app will throw an error if the tables with corresponding names are not created. Every serial number of the machine must correspond to the table name. Thus, the asset table with the static data should be filled manually with amended column that contains the names of the corresponding tables.
 This app runs on the same machine where the database is running. The IP address of the broker and the database information should be kept in the Sub_config.txt file.
 ## The recommended software
