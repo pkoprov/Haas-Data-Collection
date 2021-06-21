@@ -49,4 +49,4 @@ Subscriber computing device must have the latest Python version and the librarie
 * Pandas
 * Openpyxl.
 
-Subscriber computing device must also have PostgreSQL DB and preferably have PGAdmin installed.
+Subscriber computing device must also have [PostgreSQL DB](https://www.postgresql.org/download/) and preferably have [PGAdmin](https://www.pgadmin.org/download/) installed.
