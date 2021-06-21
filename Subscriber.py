@@ -2,9 +2,14 @@ import json
 import psycopg2 as pg
 import paho.mqtt.client as mqtt
 
-db = "HaasDataCollection"
-conn = pg.connect(f"dbname={db} user=postgres password='fwh2200'")
 
+with open("Haas-Data-Collection/Sub_config.txt") as config:
+    mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
+    db = config.readline().split(" = ")[1].replace("\n", "")
+    user = config.readline().split(" = ")[1].replace("\n", "")
+    password = config.readline().split(" = ")[1].replace("\n", "")
+
+conn = pg.connect(f"dbname={db} user={user} password={password}")
 
 try:
     cur = conn.cursor()
@@ -106,10 +111,9 @@ def row_insert(message):
 
 
 #MAIN
-mqttBroker = "192.168.10.101"
 port=1883
 client = mqtt.Client("Subscriber")
-client.connect(mqttBroker)
+client.connect(mqttBroker, port)
 
 #call-back functions
 client.on_connect = on_connect
