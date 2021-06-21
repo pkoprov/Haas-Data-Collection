@@ -36,6 +36,8 @@ This code creates the tables in PostgreSQL database. You must type the name of t
 ### [Subscriber.py](Subscriber.py)
 This code runs the subscriber app that collects the data from the MQTT broker and makes row insertions to the PostgreSQL database. This app will throw an error if the tables with corresponding names are not created. Every serial number of the machine must correspond to the table name. Thus, the asset table with the static data should be filled manually with amended column that contains the names of the corresponding tables.
 This app runs on the same machine where the database is running. The IP address of the broker and the database information should be kept in the Sub_config.txt file.
+### [Sub_config.txt](Sub_config.txt)
+This file is the input parameters for the **Subscriber.py** app.
 ## The recommended software
 Every RPI that is connected to the CNC machine must have the latest Python version and the libraries:
 * Telnetlib
