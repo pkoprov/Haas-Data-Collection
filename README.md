@@ -6,20 +6,16 @@ This project is implemented through installing the Rapberry PI as an end computi
 ### [Publisher.py](Publisher.py)
 This is a code that runs on the RPI connected to the CNC machine and sends the data to the MQTT Broker. To run this code on boot the daemon file needs to be created. The file **publisher.service** must be copied to the folder /lib/systemd/system/. This can be performed by running the following in the command line:
 
-`sudo cp /lib/systemd/system/publisher.service`
-
+```sudo cp /lib/systemd/system/publisher.service```
 After the file was copied to the root folder it needs to be enabled by the following commands:
 ```
 sudo systemctl daemon-reload
 sudo systemctl enable publisher.service
 ```
 The daemon will start working right after reboot. If you want to start the daemon immediately run following line:
-
-`sudo systemctl start publisher.service`
-
+```sudo systemctl start publisher.service```
 To check the status of the daemon run the follwoing line:
-
-`sudo systemctl status publisher.service`
+```sudo systemctl status publisher.service```
 
 The **publisher.service** is included in github repo.
 ### [Pub_config.txt](Pub_config.txt)
