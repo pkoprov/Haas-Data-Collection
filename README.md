@@ -5,4 +5,5 @@ This project is implemented through installing the Rapberry PI as an end computi
 ## Python code description
 ### Publisher.py
 This is a code that runs on the RPI connected to the CNC machine and sends the data to the MQTT Broker. In order to run this code on boot the daemon file needs to be created. The file **publisher.service** needs to be copied to the folder /lib/systemd/system/. This can be performed by running the following in the command line:
-`sudo cp /lib/systemd/system/publisher.service
+
+`sudo cp /lib/systemd/system/publisher.service`
