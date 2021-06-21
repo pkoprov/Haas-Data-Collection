@@ -28,9 +28,11 @@ Every RPI that is connected to the CNC machine must have the latest Python versi
 * Paho-mqtt
 * Pandas
 * Openpyxl.
+
 Subscriber computing device must have the latest Python version and the libraries:
 * Psycopg2
 * Paho-mqtt
 * Pandas
 * Openpyxl.
+
 Subscriber computing device must also have PostgreSQL DB and preferably have PGAdmin installed.
