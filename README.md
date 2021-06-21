@@ -24,13 +24,13 @@ This code runs the subscriber app that collects the data from the MQTT broker an
 This app runs on the same machine where the database is running. The IP address of the broker and the database information should be kept in the Sub_config.txt file.
 ## The recommended software
 Every RPI that is connected to the CNC machine must have the latest Python version and the libraries:
-•	Telnetlib
-•	Paho-mqtt
-•	Pandas
-•	Openpyxl.
+* Telnetlib
+* Paho-mqtt
+* Pandas
+* Openpyxl.
 Subscriber computing device must have the latest Python version and the libraries:
-•	Psycopg2
-•	Paho-mqtt
-•	Pandas
-•	Openpyxl.
+* Psycopg2
+* Paho-mqtt
+* Pandas
+* Openpyxl.
 Subscriber computing device must also have PostgreSQL DB and preferably have PGAdmin installed.
