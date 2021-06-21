@@ -17,7 +17,7 @@ This table contains the commands and macros that are to be send to CNC machine t
 Run this code to generate all the commands and macros that you have in the file **"Book of Macros.xlsx"**.
 ### [Q-codes.xlsx](Q-codes.xlsx)
 The table that is created after running the **Q-codes.py**.
-### [Create Table app.py](Create Table app.py)
+### [Create Table app.py](Create%20Table%20app.py)
 This code creates the tables in PostgreSQL database. You must type the name of the tables (up to you how to call them) and type **Static** to create the asset table in the database. Furthermore, you have to type the name of the tables (up to you how to call them) and type names of the variable’s sheets from the **DB Table columns.xlsx** to create the tables for every CNC machine you are gathering the data from.
 ### [Subscriber.py](Subscriber.py)
 This code runs the subscriber app that collects the data from the MQTT broker and makes row insertions to the PostgreSQL database. This app will throw an error if the tables with corresponding names are not created. Every serial number of the machine must correspond to the table name. Thus, the asset table with the static data should be filled manually with amended column that contains the names of the corresponding tables.
