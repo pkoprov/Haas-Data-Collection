@@ -3,7 +3,7 @@ import psycopg2 as pg
 import paho.mqtt.client as mqtt
 
 
-with open("Haas-Data-Collection/Sub_config.txt") as config:
+with open("Sub_config.txt") as config:
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     db = config.readline().split(" = ")[1].replace("\n", "")
     user = config.readline().split(" = ")[1].replace("\n", "")
@@ -63,7 +63,6 @@ def on_message(client, userdata, message):
         else:
             input("Incorrect input. Type 'y' or 'n': ")
     else:
-        print("Just started")
         dataObj=json.loads(msg)
         row_insert(dataObj)
 
@@ -121,7 +120,9 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 client.subscribe("status")
+subscribe(True)
 client.loop_start()
+
 run = True
 while run:
     pass
