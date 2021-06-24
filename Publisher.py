@@ -15,7 +15,10 @@ def parse(telnetdata):
             # print(msg)
         elif val_list[1] != "?":  # if value exists
             var = Q_codes["Description"][n]
-            data_dict[var] = val_list[1]
+            if var == "Spindle RPM (read only)":
+                data_dict[var] = int(float(val_list[1]))
+            else:
+                data_dict[var] = val_list[1]
     return data_dict
 
 
