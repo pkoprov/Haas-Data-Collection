@@ -15,10 +15,7 @@ def parse(telnetdata):
             # print(msg)
         elif val_list[1] != "?":  # if value exists
             var = Q_codes["Description"][n]
-            if var == "Spindle RPM (read only)":
-                data_dict[var] = int(float(val_list[1]))
-            else:
-                data_dict[var] = val_list[1]
+            data_dict[var] = val_list[1]
     return data_dict
 
 
@@ -63,6 +60,7 @@ while True:
 
     out = tn.read_until(msg, 1).decode("utf-8").replace(">", '').replace("\r\n", "|").split("|")
     out.pop(-1)
+    out[48] = "MACRO, "+ str(round(float(out[48].split(", ")[1])))
 
     if last_out:
         new_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
