@@ -43,7 +43,7 @@ def subscribe(state):
         print("Subscription stopped")
 
 def on_message(client, userdata, message):
-    print("Received message:", message.topic)
+    print("Received message in topic", message.topic)
     msg = message.payload.decode("utf-8")
 
     if msg == "start":
@@ -63,8 +63,11 @@ def on_message(client, userdata, message):
         else:
             input("Incorrect input. Type 'y' or 'n': ")
     else:
-        dataObj=json.loads(msg)
-        row_insert(dataObj)
+        try:
+            dataObj=json.loads(msg)
+            row_insert(dataObj)
+        except:
+            print('Incorrect format of message!!! "' , msg, '"')
 
 
 def row_insert(message):
