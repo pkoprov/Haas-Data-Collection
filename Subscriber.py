@@ -43,48 +43,42 @@ def subscribe(state):
         print("Subscription stopped")
 
 def on_message(client, userdata, message):
-    print("Received message in topic", message.topic)
     msg = message.payload.decode("utf-8")
-
-    if msg == "start":
-
-        subscribe(True)
-
-    elif msg == 'stop':
-        subscribe(False)
-        # client.loop_stop()
-        restart = input("Resume subscription? (y/n): ")
-        if restart == "y":
-            subscribe(True)
-        elif restart == "n":
-            client.loop_stop()
-            global run
-            run = False
-        else:
-            input("Incorrect input. Type 'y' or 'n': ")
+    if not msg:
+        pass
     else:
-        try:
-            dataObj=json.loads(msg)
-            row_insert(dataObj)
-        except:
-            print('Incorrect format of message!!! "' , msg, '"')
+        print("Received message in topic", message.topic)
+
+        # this message is from the topic "status"
+        if msg == "start":
+            subscribe(True)
+        elif msg == 'stop':
+            subscribe(False)
+            # client.loop_stop()
+            restart = input("Resume subscription? (y/n): ")
+            if restart == "y":
+                subscribe(True)
+            elif restart == "n":
+                client.loop_stop()
+                global run
+                run = False
+            else:
+                input("Incorrect input. Type 'y' or 'n': ")
+        elif msg == "Disconnected":
+            print("Unexpected power off:", msg)
+        else:
+            try:
+                dataObj=json.loads(msg)
+                row_insert(message.topic, dataObj)
+            except:
+                print('Incorrect format of message!!! "' , msg, '"')
 
 
-def row_insert(message):
+def row_insert(topic, message):
     try:
-        # read the CNC_machines table
-        cur.execute('SELECT * FROM public."CNC_machines"')
-        static_data = cur.fetchall()
-        conn.commit()
-
-        # define into which table to insert
-        for row in static_data:
-            if message["Machine Serial Number"] == row[0]:
-                table_name = row[4]
-
 
         # read column names for the current table
-        cur.execute(f'SELECT * FROM public."{table_name}"')
+        cur.execute(f'SELECT * FROM public."{topic}"')
         conn.commit()
         # print(table_name)
 
@@ -104,7 +98,7 @@ def row_insert(message):
         values = values[2:]
 
         # commit insert query
-        CMD = f'INSERT INTO public."{table_name}" ({columns}) VALUES({values})'
+        CMD = f'INSERT INTO public."{topic}" ({columns}) VALUES({values})'
         cur.execute(CMD)
         conn.commit()
 
@@ -121,6 +115,7 @@ client.connect(mqttBroker, port)
 client.on_connect = on_connect
 # client.on_log = on_log
 client.on_message = on_message
+
 
 client.subscribe("status")
 subscribe(True)
