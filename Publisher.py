@@ -3,7 +3,6 @@ import telnetlib
 import time
 
 import paho.mqtt.client as mqtt
-import pandas as pd
 
 
 def parse(telnetdata):
@@ -30,9 +29,15 @@ def on_disconnect(client, userdata, rc):
 
 
 # /home/pi/Haas-Data-Collection/DB Table columns.xlsx
-Q_codes = pd.read_excel("/home/pi/Haas-Data-Collection/DB Table columns.xlsx", sheet_name="Static")
-Q_codes = Q_codes.append(pd.read_excel("/home/pi/Haas-Data-Collection/DB Table columns.xlsx", sheet_name="Variable"),
-                         ignore_index=True)
+# Q_codes = pd.read_excel("Haas-Data-Collection/DB Table columns.xlsx", sheet_name="Static", engine = 'openpyxl')
+# Q_codes = Q_codes.append(pd.read_excel("Haas-Data-Collection/DB Table columns.xlsx", sheet_name="VF-2 Variables",
+#                                        engine = 'openpyxl'), ignore_index=True)
+with open("Haas-Data-Collection/DB Table columns.csv") as text:
+    Q_codes = text.read()
+
+Q_codes = Q_codes[3:-1].split('\n')
+for i,j in enumerate(Q_codes):
+    Q_codes[i] = j.split(',')[0]
 
 # read data specific to setup and machines
 with open("/home/pi/Haas-Data-Collection/Pub_config.txt") as config:
@@ -62,14 +67,14 @@ except:
     telnetstat = False
 
 last_out = []
-omit = list(Q_codes[(Q_codes['Variable'] == '?Q600 3012') + (Q_codes['Variable'] == '?Q300') + (
-        Q_codes['Variable'] == '?Q600 3020')].index)
+omit = list(Q_codes[(Q_codes['Variable'] == '?Q600 3012') | (Q_codes['Variable'] == '?Q300') |
+                    (Q_codes['Variable'] == '?Q600 3020')].index)
 
 while True:
 
     if telnetstat:
         # transform Q-codes from table to binary and send to the CNC machine
-        for i in Q_codes["Variable"]:
+        for i in Q_codes:
             msg = i.encode("ascii") + b"\n"
             try:
                 tn.write(msg)
