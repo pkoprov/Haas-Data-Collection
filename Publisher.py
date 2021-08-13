@@ -25,7 +25,11 @@ def publish(data_dict):
     print(f"Data published in topic {topic} {data_dict}")
 
 
-# /home/pi/Haas-Data-Collection/
+def on_disconnect(client, userdata, rc):
+    print("Disconnected with Result Code: {}".format(rc))
+
+
+# /home/pi/Haas-Data-Collection/DB Table columns.xlsx
 Q_codes = pd.read_excel("/home/pi/Haas-Data-Collection/DB Table columns.xlsx", sheet_name="Static")
 Q_codes = Q_codes.append(pd.read_excel("/home/pi/Haas-Data-Collection/DB Table columns.xlsx", sheet_name="Variable"),
                          ignore_index=True)
@@ -43,9 +47,19 @@ CNC_port = 5051
 MQTT_port = 1883
 
 client = mqtt.Client(client)
-client.connect(mqttBroker, MQTT_port)
+client.on_disconnect = on_disconnect
 
-tn = telnetlib.Telnet(CNC_host, CNC_port, 1)
+client.will_set(topic, "Disconnected",qos=1,retain=False)
+
+client.connect(mqttBroker, MQTT_port, keepalive=10) # 10 sec too receive a message
+# client.publish(topic,"Hello")
+
+try:
+    tn = telnetlib.Telnet(CNC_host, CNC_port, 1)
+    telnetstat = True
+except:
+    client.publish(topic,"Telnet connection failed!")
+    telnetstat = False
 
 last_out = []
 omit = list(Q_codes[(Q_codes['Variable'] == '?Q600 3012') + (Q_codes['Variable'] == '?Q300') + (
@@ -53,29 +67,45 @@ omit = list(Q_codes[(Q_codes['Variable'] == '?Q600 3012') + (Q_codes['Variable']
 
 while True:
 
-    # transform Q-codes from table to binary and send to the CNC machine
-    for i in Q_codes["Variable"]:
-        msg = i.encode("ascii") + b"\n"
-        tn.write(msg)
+    if telnetstat:
+        # transform Q-codes from table to binary and send to the CNC machine
+        for i in Q_codes["Variable"]:
+            msg = i.encode("ascii") + b"\n"
+            try:
+                tn.write(msg)
+            except:
+                client.publish(topic, "Telnet connection failed!")
+                telnetstat = False
 
-    out = tn.read_until(msg, 1).decode("utf-8").replace(">", '').replace("\r\n", "|").split("|")
-    out.pop(-1)
-    out[48] = "MACRO, "+ str(round(float(out[48].split(", ")[1])))
+        try:
+            out = tn.read_until(msg, 1).decode("utf-8").replace(">", '').replace("\r\n", "|").split("|")
+            out.pop(-1)
+            out[48] = "MACRO, "+ str(round(float(out[48].split(", ")[1])))
 
-    if last_out:
-        new_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
-        if new_out == last_out:
-            print("pass")
-            time.sleep(1)
-            pass
-        else:
-            data = parse(out)
-            publish(data)
-            last_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
-            time.sleep(1)
+            if last_out:
+                new_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
+                if new_out == last_out:
+                    print("pass")
+                    client.publish(topic, "")
+                    time.sleep(1)
+                    pass
+                else:
+                    data = parse(out)
+                    publish(data)
+                    last_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
+                    time.sleep(1)
+            else:
+                print('empty')
+                data = parse(out)
+                publish(data)
+                last_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
+                time.sleep(1)
+        except:
+            client.publish(topic, "Telnet connection failed!")
+            telnetstat = False
     else:
-        print('empty')
-        data = parse(out)
-        publish(data)
-        last_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
-        time.sleep(1)
+        try:
+            tn = telnetlib.Telnet(CNC_host, CNC_port, 1)
+            telnetstat = True
+        except:
+            telnetstat = False
