@@ -1,8 +1,4 @@
-import psycopg2 as pg
 import paho.mqtt.client as mqtt
-import pandas as pd
-import time
-from datetime import datetime
 
 
 with open("dash_pub_config.txt") as config:
@@ -31,5 +27,3 @@ client.on_message = on_message
 
 client.subscribe(f'FWH2200_PG_DB/output')
 client.loop_forever()
-
-
