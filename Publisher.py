@@ -18,14 +18,30 @@ def parse(telnetdata):
     return data_dict
 
 
-def publish(data_dict):
-    jsondata = json.dumps(data_dict)
+def publish(telnetdata):
+    data = parse(telnetdata)
+    jsondata = json.dumps(data)
     client.publish(topic, jsondata, qos=0)
-    print(f"Data published in topic {topic} {data_dict}")
+    print(f"Data published in topic {topic} {data}")
 
 
-def on_disconnect(client, userdata, rc):
-    print("Disconnected with Result Code: {}".format(rc))
+def telnet_connection(fail_message):
+    global tn, telnetstat, tn_err_msg
+    try:
+        client.publish(topic, '')
+        tn = telnetlib.Telnet(CNC_host, CNC_port, 1)
+        telnetstat = True
+        tn_err_msg = False
+        client.publish(topic, "Telnet connected")
+
+    except:
+        if not tn_err_msg:
+            client.publish(topic, fail_message)
+            print(fail_message)
+            tn_err_msg = True
+        else:
+            client.publish(topic, '')
+        telnetstat = False
 
 
 with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:
@@ -46,28 +62,21 @@ with open("/home/pi/Haas-Data-Collection/Pub_config.txt") as config:
     client = config.readline().split(" = ")[1].replace("\n", "")
     CNC_host = config.readline().split(" = ")[1].replace("\n", "")
 
+
 topic = client
 # topic = "HaasData"
 CNC_port = 5051
 MQTT_port = 1883
 telnetstat = False
-
-
-while not telnetstat:
-    try:
-        tn = telnetlib.Telnet(CNC_host, CNC_port, 1)
-        telnetstat = True
-    except:
-        print("Initial Telnet connection failed!")
-
+tn_err_msg = False
 
 
 client = mqtt.Client(client)
-client.on_disconnect = on_disconnect
-
 client.will_set(topic, "Disconnected",qos=1,retain=False)
+client.connect(mqttBroker, MQTT_port, keepalive=10)
 
-client.connect(mqttBroker, MQTT_port, keepalive=10) # 10 sec too receive a message
+while not telnetstat:
+    telnet_connection("Initial Telnet connection failed!")
 
 
 last_out = []
@@ -85,6 +94,7 @@ while True:
         except:
             client.publish(topic, "Telnet connection failed!: problem writing")
             telnetstat = False
+            tn_err_msg = True
 
         try:
             out = tn.read_until(msg, 1).decode("utf-8").replace(">", '').replace("\r\n", "|").split("|")
@@ -93,6 +103,8 @@ while True:
         except:
             client.publish(topic, "Telnet connection failed!: problem reading")
             telnetstat = False
+            tn_err_msg = True
+
         try:
             if last_out:
                 new_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
@@ -101,23 +113,21 @@ while True:
                     client.publish(topic, "")
                     time.sleep(1)
                     pass
-                else:
-                    data = parse(out)
-                    publish(data)
-                    last_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
+                elif new_out:
+                    print("new data")
+                    publish(out)
+                    last_out = new_out
                     time.sleep(1)
             else:
-                print('empty')
-                data = parse(out)
-                publish(data)
-                last_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
+                print('initial message')
+                if out:
+                    publish(out)
+                    last_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
                 time.sleep(1)
+
         except:
             client.publish(topic, "Parse and publish failed!")
             telnetstat = False
+            tn_err_msg = True
     else:
-        try:
-            tn = telnetlib.Telnet(CNC_host, CNC_port, 1)
-            telnetstat = True
-        except:
-            telnetstat = False
+        telnet_connection("Telnet connection failed!")
