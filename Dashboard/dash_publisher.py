@@ -1,3 +1,5 @@
+import json
+
 import psycopg2 as pg
 import paho.mqtt.client as mqtt
 import pandas as pd
@@ -25,12 +27,18 @@ port=1883
 client = mqtt.Client("FWH2200_PG_DB")
 client.connect(mqttBroker, port)
 
+topic_list = ['VF-2_1','VF-2_2' ]
+
 while True:
+    dataObj ={}
     try:
-        topic = 'VF-2_1'
-        CMD = f'SELECT * FROM public."{topic}" order by "Power-on Time (total)" desc limit 1'
-        df = pd.read_sql_query(CMD, conn)
-        message = df.to_json(orient='records')
+        for n, topic in enumerate(topic_list):
+            CMD = f'SELECT * FROM public."{topic}" order by "Year, month, day" desc, "Power-on Time (total)" desc limit 1'
+            df = pd.read_sql_query(CMD, conn)
+            dataObj[topic] = df.to_dict(orient='records')
+
+
+        message = json.dumps(dataObj)
 
         client.publish(f'FWH2200_PG_DB/output',message, qos=0)
         now = datetime.now()
