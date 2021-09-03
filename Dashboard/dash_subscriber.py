@@ -7,18 +7,21 @@ with open("dash_pub_config.txt") as config:
 
 
 def on_connect(client, userdata, flags, rc):
-    print("Connected with Result Code: {}".format(rc))
+    if rc==0:
+        print("connected OK Returned code=",rc)
+    else:
+        print("Bad connection Returned code=",rc)
 
 
-# def on_log(client, userdata, level, buffer):
-#     print("Log: ", buffer)
+def on_log(client, userdata, level, buffer):
+    print("Log: ", buffer)
 
 
 def on_message(client, userdata, message):
     msg = message.payload.decode("utf-8")
     print("Received message in topic", message.topic)
-    global dataObj
-    dataObj = json.loads(msg)
+    # global dataObj
+    # dataObj = json.loads(msg)
     print(msg)
 
 port=1883
@@ -28,7 +31,9 @@ client.on_connect = on_connect
 # client.on_log = on_log
 client.on_message = on_message
 
-client.subscribe(f'FWH2200_PG_DB/output')
-client.loop_forever()
-# client.loop_start()
+client.subscribe('FWH2200_PG_DB/#')
+# client.loop_forever()
+client.loop_start()
+while True:
+    pass
 # client.loop_stop()
