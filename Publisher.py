@@ -1,7 +1,4 @@
-import json
-import telnetlib
-import time
-
+import json, telnetlib, time
 import paho.mqtt.client as mqtt
 
 

@@ -24,9 +24,7 @@ def on_connect(client, userdata, flags, rc):
 
 def on_log(client, userdata, level, buffer):
     print("Log: ", buffer)
-#
-# def on_disconnect(client, userdata, rc=0):
-#     client.loop_stop()
+
 
 def subscribe(state):
     if state == True:
@@ -49,22 +47,7 @@ def on_message(client, userdata, message):
     else:
         print("Received message in topic", message.topic)
 
-        # this message is from the topic "status"
-        if msg == "start":
-            subscribe(True)
-        elif msg == 'stop':
-            subscribe(False)
-            # client.loop_stop()
-            restart = input("Resume subscription? (y/n): ")
-            if restart == "y":
-                subscribe(True)
-            elif restart == "n":
-                client.loop_stop()
-                global run
-                run = False
-            else:
-                input("Incorrect input. Type 'y' or 'n': ")
-        elif msg == "Disconnected":
+        if msg == "Disconnected":
             print("Unexpected power off:", msg)
         else:
             try:
