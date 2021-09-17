@@ -2,6 +2,16 @@ import json, telnetlib, time
 import paho.mqtt.client as mqtt
 
 
+def on_connect(client, userdata, flags, rc):
+    client.publish(f"clients/{topic}/publisher", 'online', retain=True)
+    print("Connected with Result Code: {}".format(rc))
+
+
+def on_disconnect(client, userdata, flags, rc):
+    client.publish(f"clients/{topic}/publisher", 'offline', retain=True)
+    print("Disconnected with Result Code: {}".format(rc))
+
+
 def parse(telnetdata):
     data_dict = {}
     for n, msg in enumerate(telnetdata):
@@ -18,7 +28,7 @@ def parse(telnetdata):
 def publish(telnetdata):
     data = parse(telnetdata)
     jsondata = json.dumps(data)
-    client.publish(topic, jsondata, qos=0)
+    client.publish(f"data/{topic}", jsondata, qos=0)
     print(f"Data published in topic {topic} {data}")
 
 
@@ -69,8 +79,11 @@ tn_err_msg = False
 
 
 client = mqtt.Client(client)
-client.will_set(topic, "Disconnected",qos=1,retain=False)
+client.on_connect = on_connect
+client.on_disconnect = on_disconnect
+client.will_set(f"clients/{topic}/publisher", 'offline', retain=True)
 client.connect(mqttBroker, MQTT_port, keepalive=10)
+client.loop_start()
 
 while not telnetstat:
     telnet_connection("Initial Telnet connection failed!")
