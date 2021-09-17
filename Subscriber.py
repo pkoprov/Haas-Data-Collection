@@ -19,11 +19,13 @@ except (Exception, pg.DatabaseError) as error:
 
 
 def on_connect(client, userdata, flags, rc):
+    client.publish("clients/redcollector21/subscriber", 'online', retain=True)
     print("Connected with Result Code: {}".format(rc))
 
 
-def on_log(client, userdata, level, buffer):
-    print("Log: ", buffer)
+def on_disconnect(client, userdata, flags, rc):
+    client.publish("clients/redcollector21/subscriber", 'offline', retain=True)
+    print("Disconnected with Result Code: {}".format(rc))
 
 
 def subscribe(state):
@@ -92,19 +94,12 @@ def row_insert(topic, message):
 #MAIN
 port=1883
 client = mqtt.Client("Subscriber")
-client.connect(mqttBroker, port)
-
 #call-back functions
 client.on_connect = on_connect
-# client.on_log = on_log
+client.on_disconnect = on_disconnect
 client.on_message = on_message
 
-
-client.subscribe("status")
+client.will_set("clients/redcollector21/subscriber", 'offline', retain=True)
+client.connect(mqttBroker, port)
 subscribe(True)
-client.loop_start()
-
-run = True
-while run:
-    pass
-print("Subscriber app terminated")
+client.loop_forever()

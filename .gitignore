@@ -3,3 +3,4 @@ test.py
 *.log
 *.dwg
 *.log
+Publisher_emulator.py
