@@ -35,19 +35,19 @@ def publish(telnetdata):
 def telnet_connection(fail_message):
     global tn, telnetstat, tn_err_msg
     try:
-        client.publish(topic, '')
+        client.publish(f"ping/{topic}", '')
         tn = telnetlib.Telnet(CNC_host, CNC_port, 1)
         telnetstat = True
         tn_err_msg = False
-        client.publish(topic, "Telnet connected")
+        client.publish(f"ping/{topic}", "Telnet connected")
 
     except:
         if not tn_err_msg:
-            client.publish(topic, fail_message)
+            client.publish(f"error/{topic}", fail_message)
             print(fail_message)
             tn_err_msg = True
         else:
-            client.publish(topic, '')
+            client.publish(f"ping/{topic}", '')
         telnetstat = False
 
 
@@ -102,7 +102,7 @@ while True:
                 msg = i.encode("ascii") + b"\n"
                 tn.write(msg)
         except:
-            client.publish(topic, "Telnet connection failed!: problem writing")
+            client.publish(f"error/{topic}", "Telnet connection failed!: problem writing")
             telnetstat = False
             tn_err_msg = True
 
@@ -111,7 +111,7 @@ while True:
             out.pop(-1)
             out[48] = "MACRO, "+ str(round(float(out[48].split(", ")[1]))) # round RPM to integer
         except:
-            client.publish(topic, "Telnet connection failed!: problem reading")
+            client.publish(f"error/{topic}", "Telnet connection failed!: problem reading")
             telnetstat = False
             tn_err_msg = True
 
@@ -120,7 +120,7 @@ while True:
                 new_out = out[:omit[0]] + out[omit[0] + 1:omit[1]] + out[omit[1] + 1:omit[2]] + out[omit[2] + 1:]
                 if new_out == last_out:
                     print("pass")
-                    client.publish(topic, "")
+                    client.publish(f"ping/{topic}", "")
                     time.sleep(1)
                     pass
                 elif new_out:
@@ -136,7 +136,7 @@ while True:
                 time.sleep(1)
 
         except:
-            client.publish(topic, "Parse and publish failed!")
+            client.publish(f"error/{topic}", "Parse and publish failed!")
             telnetstat = False
             tn_err_msg = True
     else:
