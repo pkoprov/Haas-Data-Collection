@@ -1,6 +1,8 @@
 import json
 import psycopg2 as pg
 import paho.mqtt.client as mqtt
+import pandas as pd
+from datetime import datetime, timedelta
 
 
 with open("Sub_config.txt") as config:
@@ -8,6 +10,7 @@ with open("Sub_config.txt") as config:
     db = config.readline().split(" = ")[1].replace("\n", "")
     user = config.readline().split(" = ")[1].replace("\n", "")
     password = config.readline().split(" = ")[1].replace("\n", "")
+    machines = config.readline().split(" = ")[1].replace("\n", "").split(', ')
 
 conn = pg.connect(f"dbname={db} user={user} password={password}")
 
@@ -28,44 +31,81 @@ def on_disconnect(client, userdata, flags, rc):
     print("Disconnected with Result Code: {}".format(rc))
 
 
-def subscribe(state):
-    if state == True:
-        print("Subscription started")
-        client.subscribe("VF-2_1")
-        client.subscribe("VF-2_2")
-        client.subscribe("ST-10_1")
-        client.subscribe("ST-10_2")
-    else:
-        client.unsubscribe("VF-2_1")
-        client.unsubscribe("VF-2_2")
-        client.unsubscribe("ST-10_1")
-        client.unsubscribe("ST-10_2")
-        print("Subscription stopped")
-
 def on_message(client, userdata, message):
     msg = message.payload.decode("utf-8")
+
     if not msg:
         pass
     else:
-        print("Received message in topic", message.topic)
+        print(f"Received message in topic {message.topic}")
+        if any([mach in message.topic for mach in machines]):
+            machine = machines[[mach in message.topic for mach in machines].index(True)]
+            if "data" in message.topic:
+                try:
+                    dataObj=json.loads(msg)
+                    append_table(machine, dataObj)
+                except:
+                    print('Incorrect format of message!!! "' , msg, '"')
 
-        if msg == "Disconnected":
-            print("Unexpected power off:", msg)
+            elif 'clients' in message.topic:
+                print(f"{machine} is {msg}")
+                machine_state(machine, msg)
+
+            elif 'error' in message.topic:
+                print(f"{machine} has a problem: {msg}")
         else:
-            try:
-                dataObj=json.loads(msg)
-                row_insert(message.topic, dataObj)
-            except:
-                print('Incorrect format of message!!! "' , msg, '"')
+            print(f'{message.topic} is not in machines')
 
 
-def row_insert(topic, message):
+def insert_CMD(table, columns, values):
+    CMD = f'INSERT INTO public."{table}" ({columns}) VALUES({values})'
+    cur.execute(CMD)
+    conn.commit()
+
+
+def machine_state(machine, msg):
+    CMD = f'SELECT * FROM public."{machine}" order by "Year, month, day" desc, "Hour, minute, second" desc limit 1'
+    try:
+
+        df = pd.read_sql_query(CMD, conn)
+
+        if msg == "offline":
+            if df['Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)'][0] == "POWER OFF":
+                pass
+            else:
+                if None in df.values:
+                    columns = str(["Year, month, day", "Hour, minute, second",
+                                   "Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"])[1:-1].replace("'", '"')
+                    values = str([datetime.now().strftime("%y%m%d") + ".0", datetime.now().strftime("%H%M%S") + ".0",
+                                  "POWER OFF"])[1:-1]
+                    insert_CMD(machine, columns, values)
+                else:
+                    columns = str(list(df.columns))[1:-1].replace("'", '"')
+                    df['Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)'] = "POWER OFF"
+                    df["Hour, minute, second"] = (datetime.now()+timedelta(seconds=15)).strftime("%H%M%S")+'.0'
+                    values = str(df.values.tolist()[0])[1:-1]
+                    insert_CMD(machine, columns, values)
+        else:
+            if df['Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)'][0] == "POWER ON":
+                pass
+            else:
+                columns = str(["Year, month, day", "Hour, minute, second",
+                               "Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"])[1:-1].replace("'", '"')
+                values = str([datetime.now().strftime("%y%m%d")+".0", datetime.now().strftime("%H%M%S")+".0",
+                              "POWER ON"])[1:-1]
+                insert_CMD(machine, columns, values)
+
+    except (Exception, pg.DatabaseError) as error:
+        print('machine_state error', error)
+        conn.commit()
+
+
+def append_table(table, message):
     try:
 
         # read column names for the current table
-        cur.execute(f'SELECT * FROM public."{topic}"')
+        cur.execute(f'SELECT * FROM public."{table}"')
         conn.commit()
-        # print(table_name)
 
         # create a string with column names
         columns = ""
@@ -83,17 +123,15 @@ def row_insert(topic, message):
         values = values[2:]
 
         # commit insert query
-        CMD = f'INSERT INTO public."{topic}" ({columns}) VALUES({values})'
-        cur.execute(CMD)
-        conn.commit()
+        insert_CMD(table,columns,values)
 
     except (Exception, pg.DatabaseError) as error:
-        print(error)
+        print("row_insert error",error)
 
 
 #MAIN
 port=1883
-client = mqtt.Client("Subscriber")
+client = mqtt.Client("redcollector21", True)
 #call-back functions
 client.on_connect = on_connect
 client.on_disconnect = on_disconnect
@@ -101,5 +139,6 @@ client.on_message = on_message
 
 client.will_set("clients/redcollector21/subscriber", 'offline', retain=True)
 client.connect(mqttBroker, port)
-subscribe(True)
+client.subscribe("#")
 client.loop_forever()
+# client.loop_start()
