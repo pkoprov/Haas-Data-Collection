@@ -1,4 +1,4 @@
-MQTT Broker IP = 192.168.10.11
+MQTT Broker IP = 192.168.10.14
 DataBase name = HaasDataCollection
 user = postgres
 password = fwh2200
