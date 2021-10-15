@@ -22,12 +22,12 @@ except (Exception, pg.DatabaseError) as error:
 
 
 def on_connect(client, userdata, flags, rc):
-    client.publish("clients/redcollector21/subscriber", 'online', retain=True)
+    client.publish("spBv1.0/FWH2200/STATE/redcollector21", 'ONLINE', retain=True)
     print("Connected with Result Code: {}".format(rc))
 
 
-def on_disconnect(client, userdata, flags, rc):
-    client.publish("clients/redcollector21/subscriber", 'offline', retain=True)
+def on_disconnect(client, userdata, rc):
+    client.publish("spBv1.0/FWH2200/STATE/redcollector21", 'OFFLINE', retain=True)
     print("Disconnected with Result Code: {}".format(rc))
 
 
@@ -82,7 +82,7 @@ def machine_state(machine, msg):
                 else:
                     columns = str(list(df.columns))[1:-1].replace("'", '"')
                     df['Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)'] = "POWER OFF"
-                    df["Hour, minute, second"] = (datetime.now()+timedelta(seconds=15)).strftime("%H%M%S")+'.0'
+                    df["Hour, minute, second"] = (datetime.now()-timedelta(seconds=15)).strftime("%H%M%S")+'.0'
                     values = str(df.values.tolist()[0])[1:-1]
                     insert_CMD(machine, columns, values)
         else:
@@ -116,10 +116,13 @@ def append_table(table, message):
         # create a string with VALUES
         values = ''
         for col in [col[0] for col in cur.description]:
-            try:
-                values = f"{values}, '{message[col]}'"
-            except KeyError:
-                values = f"{values}, 'NaN'"
+            if col == "Hour, minute, second":
+                values = f"{values}, {datetime.now().strftime('%H%M%S')}.0"
+            else:
+                try:
+                    values = f"{values}, '{message[col]}'"
+                except KeyError:
+                    values = f"{values}, 'NaN'"
         values = values[2:]
 
         # commit insert query
@@ -136,8 +139,7 @@ client = mqtt.Client("redcollector21", True)
 client.on_connect = on_connect
 client.on_disconnect = on_disconnect
 client.on_message = on_message
-
-client.will_set("clients/redcollector21/subscriber", 'offline', retain=True)
+client.will_set("spBv1.0/FWH2200/STATE/redcollector21", 'OFFLINE', retain=True)
 client.connect(mqttBroker, port)
 client.subscribe("#")
 client.loop_forever()
