@@ -1,7 +1,8 @@
 *.pdf
-test.py
-*.log
+.idea/
+test.*
 *.dwg
 *.log
+*_config.txt
 Publisher_emulator.py
 pico_MPU9520.py
