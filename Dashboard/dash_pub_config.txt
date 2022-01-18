@@ -1,4 +1,0 @@
-MQTT Broker IP = mqtt.eclipseprojects.io
-DataBase name = HaasDataCollection
-user = postgres
-password = fwh2200

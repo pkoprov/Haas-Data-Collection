@@ -1,3 +1,0 @@
-MQTT Broker IP = 192.168.10.11
-Name of the machine = VF-2_1
-CNC IP = 192.168.10.8
