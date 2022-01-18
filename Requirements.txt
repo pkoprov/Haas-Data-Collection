@@ -1,0 +1,4 @@
+openpyxl
+pandas
+psycopg2
+paho-mqtt

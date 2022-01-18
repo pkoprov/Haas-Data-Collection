@@ -5,3 +5,4 @@ test.py
 *.log
 Publisher_emulator.py
 pico_MPU9520.py
+.idea
