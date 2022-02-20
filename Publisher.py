@@ -3,12 +3,12 @@ import paho.mqtt.client as mqtt
 
 
 def on_connect(client, userdata, flags, rc):
-    client.publish(f"clients/{topic}/publisher", 'online', retain=True)
+    client.publish(f"spBv1.0/FWH2200/NBIRTH/{asset}_RPI", 'ONLINE', retain=True)
     print("Connected with Result Code: {}".format(rc))
 
 
 def on_disconnect(client, userdata, flags, rc):
-    client.publish(f"clients/{topic}/publisher", 'offline', retain=True)
+    client.publish(f"spBv1.0/FWH2200/NDEATH/{asset}_RPI", 'OFFLINE', retain=True)
     print("Disconnected with Result Code: {}".format(rc))
 
 
@@ -40,6 +40,7 @@ def telnet_connection(fail_message):
         telnetstat = True
         tn_err_msg = False
         client.publish(f"ping/{topic}", "Telnet connected")
+        client.publish(f"spBv1.0/FWH2200/DBIRTH/{asset}_RPI/{asset}", 'ONLINE', retain=True)
 
     except:
         if not tn_err_msg:
@@ -81,7 +82,7 @@ tn_err_msg = False
 client = mqtt.Client(client)
 client.on_connect = on_connect
 client.on_disconnect = on_disconnect
-client.will_set(f"clients/{topic}/publisher", 'offline', retain=True)
+client.will_set(f"spBv1.0/FWH2200/NDEATH/{asset}_RPI", 'OFFLINE', retain=True)
 client.connect(mqttBroker, MQTT_port, keepalive=10)
 client.loop_start()
 
