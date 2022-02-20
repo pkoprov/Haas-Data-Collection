@@ -12,6 +12,7 @@ def on_disconnect(client, userdata, flags, rc):
     print("Disconnected with Result Code: {}".format(rc))
 
 
+# function to parse output of CNC machine from telnet port
 def parse(telnetdata):
     data_dict = {}
     for n, msg in enumerate(telnetdata):
