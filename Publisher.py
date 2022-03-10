@@ -1,6 +1,10 @@
 import json, telnetlib, time
 import paho.mqtt.client as mqtt
 
+import sys
+sys.path.insert(0, "./sparkplug")
+from sparkplug.sparkplug_b import *
+
 
 def on_connect(client, userdata, flags, rc):
     client.publish(f"spBv1.0/FWH2200/NBIRTH/{asset}_RPI", 'ONLINE', retain=True)
