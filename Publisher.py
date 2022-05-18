@@ -277,9 +277,10 @@ deathPayload.metrics[0].is_historical = True
 client = mqtt.Client(myNodeName, clean_session=True)
 client.on_connect = on_connect
 client.on_message = on_message
+client.username_pw_set(myUsername, myPassword)
 deathByteArray = deathPayload.SerializeToString()
 client.will_set("spBv1.0/" + myGroupId + "/NDEATH/" + myNodeName, deathByteArray, 0, False)
-client.connect('localhost', 1883, 60)
+client.connect(mqttBroker, 1883, 60)
 
 # Short delay to allow connect callback to occur
 client.loop_start()
