@@ -5,7 +5,7 @@ import time
 
 import paho.mqtt.client as mqtt
 
-# sys.path.insert(0, "../spb/")
+# sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")
 sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")
 
 import sparkplug_b as sparkplug
@@ -156,11 +156,13 @@ def publishNdata():
         if metric.name == "Node time":
             continue
         elif metric.name == "CNC IP" and metric.string_value != \
-                [met.string_value for met in previous_Ndata.metrics if met.name == metric.name][0]: # look for matching metric
+                [met.string_value for met in previous_Ndata.metrics if met.name == metric.name][
+                    0]:  # look for matching metric
             stale = False
             break
         elif metric.name == "CNC status" and metric.boolean_value != \
-                [met.boolean_value for met in previous_Ndata.metrics if met.name == metric.name][0]: # look for matching metric
+                [met.boolean_value for met in previous_Ndata.metrics if met.name == metric.name][
+                    0]:  # look for matching metric
             stale = False
             break
         else:
@@ -239,7 +241,7 @@ def parse(telnetdata, par_name):
 
 # read data specific to setup and machines
 with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Pub_config.txt") as config:
-    # "/home/pi/Haas-Data-Collection/Pub_config.txt"
+    # "/home/pi/Desktop/Haas-Data-Collection/Pub_config.txt"
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
@@ -290,7 +292,6 @@ tn_status = False
 # Publish Node birth certificate
 publishNodeBirth()
 
-
 tn_connect(CNC_host, 5)
 
 while True:
@@ -312,26 +313,28 @@ while True:
         time.sleep(1)
         # continue
 
-    for i, metric in enumerate(payload.metrics): # iterate through new metric's values to find if there was a change
-        if metric.name in ['Year, month, day', 'Hour, minute, second','Power-on Time (total)', 'Power on timer (read only)']: # ignore these metrics
+    for i, metric in enumerate(payload.metrics):  # iterate through new metric's values to find if there was a change
+        if metric.name in ['Year, month, day', 'Hour, minute, second', 'Power-on Time (total)',
+                           'Power on timer (read only)']:  # ignore these metrics
             continue
         else:
-            previous_metric = [met for met in previous_Ddata.metrics if met.name == metric.name][0] # find previous metric matching current metric
-            if metric.name == "Coolant level" and abs(metric.float_value - previous_metric.float_value) < 2: # if coolant level is stable
+            previous_metric = [met for met in previous_Ddata.metrics if met.name == metric.name][
+                0]  # find previous metric matching current metric
+            if metric.name == "Coolant level" and abs(
+                    metric.float_value - previous_metric.float_value) < 2:  # if coolant level is stable
                 stale = True
                 continue
-            elif (previous_metric.datatype == MetricDataType.String and metric.string_value == previous_metric.string_value) or\
-                 (previous_metric.datatype == MetricDataType.Float and metric.float_value == previous_metric.float_value) or\
-                 (previous_metric.datatype == MetricDataType.Int32 and metric.int_value == previous_metric.int_value) or\
-                 (previous_metric.datatype == MetricDataType.Boolean and metric.boolean_value == previous_metric.boolean_value):
+            elif (
+                    previous_metric.datatype == MetricDataType.String and metric.string_value == previous_metric.string_value) or (
+                    previous_metric.datatype == MetricDataType.Float and metric.float_value == previous_metric.float_value) or (
+                    previous_metric.datatype == MetricDataType.Int32 and metric.int_value == previous_metric.int_value) or (
+                    previous_metric.datatype == MetricDataType.Boolean and metric.boolean_value == previous_metric.boolean_value):
                 stale = True
                 continue
             else:
                 print(f"'{metric.name}' has changed")
                 stale = False
                 break
-
-
 
     if 'stale' in globals().keys() and not stale:
         totalByteArray = payload.SerializeToString()
