@@ -153,7 +153,7 @@ def publishDeviceData():
             previous_metric = [met for met in previous_Ddata.metrics if met.name == metric.name][
                 0]  # find previous metric matching current metric
             if metric.name == "Coolant level" and abs(
-                    metric.float_value - previous_metric.float_value) <= 2:  # if coolant level is stable
+                    metric.float_value - previous_metric.float_value) < 2:  # if coolant level is stable
                 stale = True
                 continue
             elif (
@@ -226,6 +226,7 @@ deathPayload.metrics[0].is_historical = True
 deathByteArray = deathPayload.SerializeToString()
 client.will_set("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, deathByteArray, qos, ret)
 client.connect(mqttBroker, 1883, 60)
+client.loop_start()
 
 # read required parameters from csv file
 with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:
