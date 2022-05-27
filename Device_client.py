@@ -1,7 +1,7 @@
 import sys
 
-sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")
-# sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")
+# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")
+sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
@@ -197,8 +197,8 @@ def publishDeviceDeath():
 
 
 # read data specific to setup and machines
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config:
-    # "/home/pi/Desktop/Haas-Data-Collection/Pub_config.txt"
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config:
+with open("/home/pi/Haas-Data-Collection/Node.config") as config:
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
@@ -229,7 +229,8 @@ client.connect(mqttBroker, 1883, 60)
 client.loop_start()
 
 # read required parameters from csv file
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:
+with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:
     parameters = text.read().split('\n')[:-1]
 
 # create parameter tuples

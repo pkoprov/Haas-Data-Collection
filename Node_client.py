@@ -5,8 +5,8 @@ import time
 
 import paho.mqtt.client as mqtt
 
-sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")
-# sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")
+# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")
+sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
@@ -15,7 +15,8 @@ from sparkplug_b import *
 def device_ping(device_ip, timeout=1):
     global device_online
     while True:
-        if os.system("ping -n 1 " + device_ip + ' | find "Received = 1"') == 0:
+        if os.system("ping -c 1 " + device_ip + ' | grep "1 received"') == 0:
+#         if os.system("ping -c 1 " + device_ip + ' | find "Received = 1"') == 0:
             if "device_online" not in globals().keys() or not device_online:
                 payload = sparkplug.getDdataPayload()
                 addMetric(payload, "Device Status", None, MetricDataType.String, "start")
@@ -178,8 +179,8 @@ def getNdata():
 
 
 # read data specific to setup and machines
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config:
-    # "/home/pi/Desktop/Haas-Data-Collection/Pub_config.txt"
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config:
+with open("/home/pi/Haas-Data-Collection/Node.config") as config:
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
