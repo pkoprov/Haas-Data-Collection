@@ -1,8 +1,7 @@
 import os
 import sys
-import telnetlib
-import time
 import threading
+import time
 
 import paho.mqtt.client as mqtt
 
@@ -11,29 +10,22 @@ sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
-from Device_client import NGC
 
-def tn_connect(CNC_host, timeout):
-    global tn_status, tn
+
+def device_ping(device_ip, timeout=1):
+    global device_online
     while True:
-        if "tn_status" not in globals().keys() or not tn_status:
-            try:
-                tn = telnetlib.Telnet(CNC_host, port, timeout)
-                tn_status = True
-                print("Connected to CNC")
-
-            except:
-                tn_status = False
-                time.sleep(1)
-                if "tn_status_informed" not in locals().keys():
-                    print("Connection to CNC failed")
-                    tn_status_informed = True
-                continue
-            payload = sparkplug.getDdataPayload()
-            addMetric(payload, "Device Status", None, MetricDataType.String, "start")
-            totalByteArray = payload.SerializeToString()
-            client.publish("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/" + myDeviceName, totalByteArray,
-                           qos, False)
+        if os.system("ping -n 1 " + device_ip + ' | find "Received = 1"') == 0:
+            if "device_online" not in globals().keys() or not device_online:
+                payload = sparkplug.getDdataPayload()
+                addMetric(payload, "Device Status", None, MetricDataType.String, "start")
+                totalByteArray = payload.SerializeToString()
+                client.publish("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/" + myDeviceName, totalByteArray,
+                               qos, False)
+                time.sleep(3)
+        else:
+            print("CNC is dead")
+        time.sleep(timeout)
 
 
 ######################################################################
@@ -82,22 +74,21 @@ def on_message(client, userdata, msg):
                 if metric.name == "Device Status":
                     if metric.string_value == "start":
                         print("Starting of the Device program")
-                        globals()['vf2'] = NGC(r'C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv', tn, client)
-                    elif metric.string_value == "stop":
-                        print("Stopping of the Device program")
-                        tn.close()
-                        global tn_status
-                        tn_status = False
-                        time.sleep(3)
+                        os.system("python ./Device_client.py")
 
-            # elif tokens[2] in ("DBIRTH", "DDEATH") and tokens[4] == myDeviceName:
-            #     global dBirthTime, dDeathTime, tn_status
-            #     dBirthTime = metric.timestamp
-            #     if all([var in globals().keys() for var in ["dBirthTime", "dDeathTime"]]):
-            #         if dBirthTime <= dDeathTime:
-            #             tn_status = False
-            #         else:
-            #             tn_status = True
+            elif tokens[2] in ("DBIRTH", "DDEATH") and tokens[4] == myDeviceName:
+
+                if time.time() - inboundPayload.timestamp / 1000 > 1:
+                    pass
+                else:
+                    global device_online
+                    if tokens[2] == "DBIRTH":
+                        print("Device Birth Certificate has been received")
+                        device_online = True
+
+                    elif tokens[2] == "DDEATH":
+                        print("Device Death Certificate has been received")
+                        device_online = False  # set device offline
     else:
         print("Unknown command...")
 
@@ -126,10 +117,10 @@ def publishNodeBirth():
 
     # Add some regular node metrics
     addMetric(payload, "Node time", None, MetricDataType.Float, time.time())
-    global CNC_host, tn_status
+    global CNC_host, device_online
     addMetric(payload, "CNC IP", None, MetricDataType.String, CNC_host)
     try:
-        addMetric(payload, "CNC status", None, MetricDataType.Boolean, tn_status)
+        addMetric(payload, "CNC status", None, MetricDataType.Boolean, device_online)
     except:
         addMetric(payload, "CNC status", None, MetricDataType.Boolean, False)
 
@@ -180,7 +171,7 @@ def getNdata():
     addMetric(payload, "Node time", None, MetricDataType.Float, time.time())
     addMetric(payload, "CNC IP", None, MetricDataType.String, CNC_host)
     try:
-        addMetric(payload, "CNC status", None, MetricDataType.Boolean, tn_status)
+        addMetric(payload, "CNC status", None, MetricDataType.Boolean, device_online)
     except:
         addMetric(payload, "CNC status", None, MetricDataType.Boolean, False)
     return payload
@@ -220,17 +211,9 @@ time.sleep(1)
 # Publish Node birth certificate
 publishNodeBirth()
 
-device_NGC = threading.Thread(target=tn_connect, args=(CNC_host, 1))
+device_NGC = threading.Thread(target=device_ping, args=(CNC_host, 1))
 device_NGC.start()
 time.sleep(3)
 
-
-
 while True:
     publishNdata()
-    if "vf2" in globals().keys() and vf2.tn_online:
-        try:
-            vf2.publishDeviceData()
-        except NameError:
-            pass
-
