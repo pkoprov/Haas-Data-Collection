@@ -18,7 +18,7 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#")
         print("Connected with result code " + str(rc))
     else:
-        print("Failed to connect with result code " + str(rc))
+        print("Failed to connect with result code " + str(rc)+"\n")
         sys.exit()
 
 
@@ -26,14 +26,14 @@ def on_connect(client, userdata, flags, rc):
 # The callback for when a PUBLISH message is received from the server.
 ######################################################################
 def on_message(client, userdata, msg):
-    print("Message arrived: " + msg.topic)
+    print("Device message arrived: " + msg.topic)
     tokens = msg.topic.split("/")
 
     if tokens[0] == "spBv1.0" and tokens[1] == myGroupId and tokens[2] == "DCMD" and tokens[3] == myNodeName:
         inboundPayload = sparkplug_b_pb2.Payload()
         inboundPayload.ParseFromString(msg.payload)
         for metric in inboundPayload.metrics:
-            if metric.name == "Device Control/Rebirth":
+            if metric.name == "Device Control/Rebirth" and metric.boolean_value == True:
                 publishDeviceBirth()
                 print("Device has been reborn")
             elif metric.name == "Device Control/Reconnect":
@@ -44,6 +44,7 @@ def on_message(client, userdata, msg):
                     tn = open(CNC_host, 5051, 3)
                 except:
                     print("Device reconnect failed")
+                    tn.close()
                     sys.exit()
             elif metric.name == "bdSeq":
                 pass
@@ -66,20 +67,17 @@ def getDdata():
         except:
             # if connection fails, try to reconnect
             print(f"Telnet connection failed! Could not write {code} ({par[0]}) to CNC machine")
-            publishDeviceDeath()
             raise ConnectionError
         try:
             msg = tn.read_until(b'\n', 1)
         except:
             # if connection fails, try to reconnect
             print(f"Telnet connection failed! Could not read from CNC machine")
-            publishDeviceDeath()
             raise ConnectionError
         try:
             value = parse(msg, par[0])
         except ValueError:
             print(f"{n} Empty value for {par[0]}")
-            publishDeviceDeath()
             raise ConnectionError
         if par[1] == 3:  # int
             value = int(float(value))
@@ -121,7 +119,13 @@ def parse(telnetdata, par_name):
 def publishDeviceBirth():
     global previous_Ddata
     print("Publishing Device Birth Certificate")
-    payload = getDdata()
+    try:
+        payload = getDdata()
+    except:
+        print("Could not get data from CNC machine")
+        tn.close()
+        sys.exit()
+        return
     addMetric(payload, "Device Control/Rebirth", None, MetricDataType.Boolean, False)
     addMetric(payload, "Device Control/Reboot", None, MetricDataType.Boolean, False)
 
@@ -129,7 +133,7 @@ def publishDeviceBirth():
     # Publish the initial data with the Device BIRTH certificate
     client.publish("spBv1.0/" + myGroupId + "/DBIRTH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2,
                    True)
-
+    time.sleep(0.1)
     print("Device Birth Certificate has been published")
     previous_Ddata = payload
 
@@ -139,8 +143,10 @@ def publishDeviceData():
     global previous_Ddata
     try:
         payload = getDdata()
-    except ConnectionError:
+    except:
         print("Could not get data from CNC machine")
+        tn.close()
+        publishDeviceDeath()
         sys.exit()
         return
 
@@ -168,11 +174,9 @@ def publishDeviceData():
                 stale = False
                 break
     if stale:
-        print(f"{payload.timestamp} Data is stale")
+        pass
 
     else:
-        addMetric(payload, "Device Control/Rebirth", None, MetricDataType.Boolean, False)
-        addMetric(payload, "Device Control/Reboot", None, MetricDataType.Boolean, False)
 
         totalByteArray = payload.SerializeToString()
         # Publish the initial data with the Device BIRTH certificate
@@ -185,14 +189,15 @@ def publishDeviceData():
 
 
 def publishDeviceDeath():
-    deathPayload = sparkplug.getNodeDeathPayload()
+    deathPayload = sparkplug.getDdataPayload()
     print("Publishing Device Death Certificate")
-    addMetric(deathPayload, "Device Control/Rebirth", None, MetricDataType.Boolean, False)
     addMetric(deathPayload, "Device Control/Reboot", None, MetricDataType.Boolean, True)
     totalByteArray = deathPayload.SerializeToString()
     client.publish("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2,
                    True)
     print("Device Death Certificate has been published")
+    time.sleep(0.1)
+    tn.close()
     sys.exit()
 
 
@@ -210,8 +215,9 @@ with open("/home/pi/Haas-Data-Collection/Node.config") as config:
 
 try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
-except TimeoutError:
+except:
     print("Cannot connect to CNC machine")
+    sys.exit()
 
 qos = 2
 ret = True
@@ -219,14 +225,10 @@ client = mqtt.Client(myDeviceName, clean_session=True)
 client.on_connect = on_connect
 client.on_message = on_message
 client.username_pw_set(myUsername, myPassword)
-# Create the node death payload
-deathPayload = sparkplug.getNodeDeathPayload()
-deathPayload.metrics[0].is_historical = True
 
-deathByteArray = deathPayload.SerializeToString()
-client.will_set("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, deathByteArray, qos, ret)
 client.connect(mqttBroker, 1883, 60)
 client.loop_start()
+time.sleep(0.1)
 
 # read required parameters from csv file
 # with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:

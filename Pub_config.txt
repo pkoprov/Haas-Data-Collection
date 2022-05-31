@@ -1,9 +1,0 @@
-MQTT Broker IP = <broker ip address>
-group ID = <group id with accordance with SpB>
-Edge of node name = <name of your node>
-Name of the machine = <name of CNC machine>
-CNC IP = <Ethernet CNC IP>
-myUsername = <username for MQTT>
-myPassword = <password for MQTT>
-
-

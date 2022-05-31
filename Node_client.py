@@ -14,18 +14,26 @@ from sparkplug_b import *
 
 def device_ping(device_ip, timeout=1):
     global device_online
-    while True:
+    while not device_online:
         if os.system("ping -c 1 " + device_ip + ' | grep "1 received"') == 0:
 #         if os.system("ping -c 1 " + device_ip + ' | find "Received = 1"') == 0:
-            if "device_online" not in globals().keys() or not device_online:
-                payload = sparkplug.getDdataPayload()
-                addMetric(payload, "Device Status", None, MetricDataType.String, "start")
-                totalByteArray = payload.SerializeToString()
-                client.publish("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/" + myDeviceName, totalByteArray,
-                               qos, False)
+
+            if not device_online:
+                print("Starting of the Device program")
+                os.system("python3 ./Device_client.py")
+#                 payload = sparkplug.getDdataPayload()
+#                 addMetric(payload, "Device Status", None, MetricDataType.String, "start")
+#                 totalByteArray = payload.SerializeToString()
+#                 client.publish("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/" + myDeviceName, totalByteArray,
+#                                qos, False)
                 time.sleep(3)
         else:
-            print("CNC is dead")
+            if device_online:
+                print("NGC is not reachable")
+                device_online = False
+            else:
+                pass
+
         time.sleep(timeout)
 
 
@@ -34,10 +42,10 @@ def device_ping(device_ip, timeout=1):
 ######################################################################
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        client.subscribe("spBv1.0/" + myGroupId + "/NCMD/" + myNodeName + "/#")
-        client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#")
-        client.subscribe("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/#")
-        client.subscribe("spBv1.0/" + myGroupId + "/DBIRTH/" + myNodeName + "/#")
+        client.subscribe("spBv1.0/" + myGroupId + "/NCMD/" + myNodeName + "/#", qos)
+        client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#", qos)
+        client.subscribe("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/#", qos)
+        client.subscribe("spBv1.0/" + myGroupId + "/DBIRTH/" + myNodeName + "/#", qos)
         print("Connected with result code " + str(rc))
     else:
         print("Failed to connect with result code " + str(rc))
@@ -54,8 +62,8 @@ def on_message(client, userdata, msg):
     if tokens[0] == "spBv1.0" and tokens[1] == myGroupId and tokens[3] == myNodeName:
         inboundPayload = sparkplug_b_pb2.Payload()
         inboundPayload.ParseFromString(msg.payload)
-        for metric in inboundPayload.metrics:
-            if tokens[2] == "NCMD":
+        if tokens[2] == "NCMD":
+            for metric in inboundPayload.metrics:
                 if metric.name == "Node Control/Next Server":
                     print("'Node Control/Next Server' is not implemented in this example")
                 elif metric.name == "Node Control/Rebirth":
@@ -71,25 +79,32 @@ def on_message(client, userdata, msg):
                     pass
                 else:
                     print("Unknown command: " + metric.name)
-            elif tokens[2] == "DCMD" and tokens[4] == myDeviceName:
+        elif tokens[2] == "DCMD" and tokens[4] == myDeviceName:
+            for metric in inboundPayload.metrics:
                 if metric.name == "Device Status":
                     if metric.string_value == "start":
                         print("Starting of the Device program")
                         os.system("python ./Device_client.py")
 
-            elif tokens[2] in ("DBIRTH", "DDEATH") and tokens[4] == myDeviceName:
-
-                if time.time() - inboundPayload.timestamp / 1000 > 1:
-                    pass
-                else:
-                    global device_online
-                    if tokens[2] == "DBIRTH":
-                        print("Device Birth Certificate has been received")
-                        device_online = True
-
-                    elif tokens[2] == "DDEATH":
-                        print("Device Death Certificate has been received")
-                        device_online = False  # set device offline
+        elif tokens[2] in ("DBIRTH", "DDEATH") and tokens[4] == myDeviceName:
+            if time.time() - inboundPayload.timestamp/1000 < 1:
+                global dBirthTime, dDeathTime, device_online
+                if tokens[2] == "DBIRTH":
+                    print("Device Birth Certificate has been received")
+                    dBirthTime = inboundPayload.timestamp
+                    flag = True
+                    
+                elif tokens[2] == "DDEATH":
+                    print("Device Death Certificate has been received")
+                    dDeathTime = inboundPayload.timestamp
+                    flag = False
+                    
+                if all(var in globals().keys() for var in ['dBirthTime', 'dDeathTime']):
+                    if dDeathTime > dBirthTime:
+                        flag = False
+                    else:
+                        flag = True
+                device_online = flag
     else:
         print("Unknown command...")
 
@@ -109,21 +124,12 @@ def publishNodeBirth():
     print("Publishing Node Birth Certificate")
 
     # Create the node birth payload
-    payload = sparkplug.getNodeBirthPayload()
+    payload = getNdata()
 
     # Set up the Node Controls
     addMetric(payload, "Node Control/Next Server", None, MetricDataType.Boolean, False)
     addMetric(payload, "Node Control/Rebirth", None, MetricDataType.Boolean, False)
     addMetric(payload, "Node Control/Reboot", None, MetricDataType.Boolean, False)
-
-    # Add some regular node metrics
-    addMetric(payload, "Node time", None, MetricDataType.Float, time.time())
-    global CNC_host, device_online
-    addMetric(payload, "CNC IP", None, MetricDataType.String, CNC_host)
-    try:
-        addMetric(payload, "CNC status", None, MetricDataType.Boolean, device_online)
-    except:
-        addMetric(payload, "CNC status", None, MetricDataType.Boolean, False)
 
     globals()['previous_Ndata'] = payload
     # Publish the node birth certificate
@@ -171,10 +177,8 @@ def getNdata():
     payload = sparkplug_b_pb2.Payload()
     addMetric(payload, "Node time", None, MetricDataType.Float, time.time())
     addMetric(payload, "CNC IP", None, MetricDataType.String, CNC_host)
-    try:
-        addMetric(payload, "CNC status", None, MetricDataType.Boolean, device_online)
-    except:
-        addMetric(payload, "CNC status", None, MetricDataType.Boolean, False)
+    global device_online
+    addMetric(payload, "CNC status", None, MetricDataType.Boolean, device_online)
     return payload
 
 
@@ -196,7 +200,7 @@ deathPayload.metrics[0].is_historical = True
 # Start of main program - Set up the MQTT client connection
 qos = 2
 ret = True
-client = mqtt.Client(myNodeName, clean_session=True)
+client = mqtt.Client(myNodeName, clean_session=False)
 client.on_connect = on_connect
 client.on_message = on_message
 client.username_pw_set(myUsername, myPassword)
@@ -209,10 +213,11 @@ client.loop_start()
 port = 5051
 time.sleep(1)
 
+device_online = False
 # Publish Node birth certificate
 publishNodeBirth()
 
-device_NGC = threading.Thread(target=device_ping, args=(CNC_host, 1))
+device_NGC = threading.Thread(target=device_ping, args=(CNC_host,1))
 device_NGC.start()
 time.sleep(3)
 
