@@ -1,7 +1,7 @@
 import sys
 
-# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")
-sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")
+# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb") # uncomment for Windows
+sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
@@ -15,10 +15,10 @@ import paho.mqtt.client as mqtt
 ######################################################################
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#")
+        client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#", qos)
         print("Connected with result code " + str(rc))
     else:
-        print("Failed to connect with result code " + str(rc)+"\n")
+        print("Failed to connect with result code " + str(rc) + "\n")
         sys.exit()
 
 
@@ -29,11 +29,12 @@ def on_message(client, userdata, msg):
     print("Device message arrived: " + msg.topic)
     tokens = msg.topic.split("/")
 
+    # if the message is purposed for this device and is a command
     if tokens[0] == "spBv1.0" and tokens[1] == myGroupId and tokens[2] == "DCMD" and tokens[3] == myNodeName:
-        inboundPayload = sparkplug_b_pb2.Payload()
-        inboundPayload.ParseFromString(msg.payload)
-        for metric in inboundPayload.metrics:
-            if metric.name == "Device Control/Rebirth" and metric.boolean_value == True:
+        inboundPayload = sparkplug_b_pb2.Payload()  # create a new payload object
+        inboundPayload.ParseFromString(msg.payload)  # parse the payload into the payload object
+        for metric in inboundPayload.metrics:  # iterate through the metrics in the payload
+            if metric.name == "Device Control/Rebirth" and metric.boolean_value:
                 publishDeviceBirth()
                 print("Device has been reborn")
             elif metric.name == "Device Control/Reconnect":
@@ -44,7 +45,6 @@ def on_message(client, userdata, msg):
                     tn = open(CNC_host, 5051, 3)
                 except:
                     print("Device reconnect failed")
-                    tn.close()
                     sys.exit()
             elif metric.name == "bdSeq":
                 pass
@@ -54,28 +54,28 @@ def on_message(client, userdata, msg):
         print("Unknown command...")
 
 
-# function to get data from CNC machine
+# function to get data from NGC
 def getDdata():
     payload = sparkplug.getDdataPayload()
     n = 1
     # Add device metrics
-    for par in par_list:
+    for par in par_list: # iterate through the parameters
         code = par[-1].encode() + b"\n"
         try:
-            tn.read_very_eager()
-            tn.write(code)
+            tn.read_very_eager() # clear buffer
+            tn.write(code) # send command
         except:
             # if connection fails, try to reconnect
             print(f"Telnet connection failed! Could not write {code} ({par[0]}) to CNC machine")
             raise ConnectionError
         try:
-            msg = tn.read_until(b'\n', 1)
+            msg = tn.read_until(b'\n', 1) # read response
         except:
             # if connection fails, try to reconnect
             print(f"Telnet connection failed! Could not read from CNC machine")
             raise ConnectionError
         try:
-            value = parse(msg, par[0])
+            value = parse(msg, par[0]) # parse response
         except ValueError:
             print(f"{n} Empty value for {par[0]}")
             raise ConnectionError
@@ -120,12 +120,12 @@ def publishDeviceBirth():
     global previous_Ddata
     print("Publishing Device Birth Certificate")
     try:
-        payload = getDdata()
+        payload = getDdata() # get data from NGC
     except:
         print("Could not get data from CNC machine")
         tn.close()
         sys.exit()
-        return
+
     addMetric(payload, "Device Control/Rebirth", None, MetricDataType.Boolean, False)
     addMetric(payload, "Device Control/Reboot", None, MetricDataType.Boolean, False)
 
@@ -148,7 +148,6 @@ def publishDeviceData():
         tn.close()
         publishDeviceDeath()
         sys.exit()
-        return
 
     for i, metric in enumerate(
             payload.metrics):  # iterate through new metrics values to find if there was a change
@@ -177,15 +176,12 @@ def publishDeviceData():
         pass
 
     else:
-
         totalByteArray = payload.SerializeToString()
         # Publish the initial data with the Device BIRTH certificate
-        client.publish("spBv1.0/" + myGroupId + "/DDATA/" + myNodeName + "/" + myDeviceName, totalByteArray, 2,
-                       True)
+        client.publish("spBv1.0/" + myGroupId + "/DDATA/" + myNodeName + "/" + myDeviceName, totalByteArray, 2, True)
 
         print("^Device Data has been published")
-
-        previous_Ddata = payload
+        previous_Ddata = payload # update previous data
 
 
 def publishDeviceDeath():
@@ -193,8 +189,7 @@ def publishDeviceDeath():
     print("Publishing Device Death Certificate")
     addMetric(deathPayload, "Device Control/Reboot", None, MetricDataType.Boolean, True)
     totalByteArray = deathPayload.SerializeToString()
-    client.publish("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2,
-                   True)
+    client.publish("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2, True)
     print("Device Death Certificate has been published")
     time.sleep(0.1)
     tn.close()
@@ -202,8 +197,8 @@ def publishDeviceDeath():
 
 
 # read data specific to setup and machines
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config:
-with open("/home/pi/Haas-Data-Collection/Node.config") as config:
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
+with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment for Raspberry Pi
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
@@ -211,7 +206,6 @@ with open("/home/pi/Haas-Data-Collection/Node.config") as config:
     CNC_host = config.readline().split(" = ")[1].replace("\n", "")
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
-
 
 try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
@@ -231,8 +225,8 @@ client.loop_start()
 time.sleep(0.1)
 
 # read required parameters from csv file
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:
-with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text: # uncomment for Windows
+with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:    # uncomment for Raspberry Pi
     parameters = text.read().split('\n')[:-1]
 
 # create parameter tuples
@@ -252,8 +246,7 @@ for i, par in enumerate(parameters):
     par_list.append((name, data_type, code))
 par_list = tuple(par_list)
 
-
-publishDeviceBirth()
+publishDeviceBirth() # publish birth certificate
 
 while True:
-    publishDeviceData()
+    publishDeviceData() # publish data if data has changed
