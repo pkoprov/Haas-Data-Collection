@@ -106,8 +106,8 @@ def parse(telnetdata, par_name):
             val = int(float(msg[1]))
         else:
             val = msg[1]
-    elif 'program' in ''.join(msg).lower() and "parts" in ''.join(msg).lower():
-        val = str([msg[i] for i in (1, 2, 4)])[1:-1]
+    elif ('program' and "parts") in ''.join(msg).lower():
+        val = ', '.join(msg)
     elif 'busy' in ''.join(msg).lower():
         val = "busy"
     else:
