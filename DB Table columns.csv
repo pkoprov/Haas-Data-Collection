@@ -1,6 +1,3 @@
-?Q100,Machine Serial Number,str
-?Q101,Control Software Version,str
-?Q102,Machine Model Number,str
 ?Q600 3011,Year; month; day,str
 ?Q600 3012,Hour; minute; second,str
 ?Q104,Mode (LIST PROG; MDI; etc.),str
