@@ -37,12 +37,12 @@
 ?Q600 1818,Max recorded vibrations of tool 18,float
 ?Q600 1819,Max recorded vibrations of tool 19,float
 ?Q600 1820,Max recorded vibrations of tool 20,float
-?Q600 3020,Power on timer (read only),str
-?Q600 3021,Cycle start timer, str
-?Q600 3022,Feed timer,str
-?Q600 3023,Present part timer (read only),str
-?Q600 3024,Last complete part timer (read only),str
-?Q600 3025,Previous part timer (read only),str
+?Q600 3020,Power on timer (read only),float
+?Q600 3021,Cycle start timer, float
+?Q600 3022,Feed timer,float
+?Q600 3023,Present part timer (read only),float
+?Q600 3024,Last complete part timer (read only),float
+?Q600 3025,Previous part timer (read only),float
 ?Q600 3027,Spindle RPM (read only),int
 ?Q600 5021,Present machine coordinate position X,float
 ?Q600 5022,Present machine coordinate position Y,float
