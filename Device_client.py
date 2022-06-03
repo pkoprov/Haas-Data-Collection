@@ -109,7 +109,7 @@ def parse(telnetdata, par_name):
     elif ('program' and "parts") in ''.join(msg).lower():
         val = ', '.join(msg)
     elif 'busy' in ''.join(msg).lower():
-        val = "busy"
+        val = "BUSY"
     else:
         raise ValueError("No value found for parameter: " + par_name)
     return val
