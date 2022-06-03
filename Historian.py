@@ -1,24 +1,23 @@
 import sys
 
 import paho.mqtt.client as mqtt
-import numpy as np
 import psycopg2 as pg
 
 sys.path.insert(0, r'C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb')  # uncomment for Windows
 
 from sparkplug_b import *
 
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\historian.config", 'r') as config:
+with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\historian.config", 'r') as config: # uncomment for Windows
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     dbName = config.readline().split(" = ")[1].replace("\n", "")
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
 
-conn = pg.connect(f"dbname={dbName} user={myUsername} password={myPassword}")
+conn = pg.connect(f"dbname={dbName} user={myUsername} password={myPassword}") # connect to DB
 
 try:
-    cur = conn.cursor()
+    cur = conn.cursor() # create a cursor object
     print("Subscriber connection established")
 except (Exception, pg.DatabaseError) as error:
     print(error)
@@ -26,7 +25,7 @@ except (Exception, pg.DatabaseError) as error:
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        client.subscribe("spBv1.0/" + myGroupId + "/#", qos)
+        client.subscribe("spBv1.0/" + myGroupId + "/#", qos) # subscribe to all topics in the group
         print("Connected with result code " + str(rc))
     else:
         print("Failed to connect with result code " + str(rc))
@@ -37,7 +36,7 @@ def on_message(client, userdata, msg):
     print("Message arrived: " + msg.topic)
     tokens = msg.topic.split("/")
 
-    if tokens[0] == "spBv1.0" and tokens[1] == myGroupId:
+    if tokens[0] == "spBv1.0" and tokens[1] == myGroupId: # check if the message is for this group
         inboundPayload = sparkplug_b_pb2.Payload()  # create a payload object
         inboundPayload.ParseFromString(msg.payload)  # parse the payload into the payload object
 
@@ -76,15 +75,16 @@ def insert_CMD(table, columns, values):
 def append_table(table, message, dBirth=False, dDeath=False):
     try:
         # read column names for the current table
-        cur.execute(f'SELECT * FROM "AML"."{table}" order by "Power on timer (read only)" desc limit 1')
+        cur.execute(f'SELECT * FROM "AML"."{table}" order by "Power on timer (read only)" desc limit 1') # get the last row
         conn.commit()
     except (Exception, pg.DatabaseError) as error:
         print("DB query error: ", error)
 
     try:
-        dbData = cur.fetchone()
+        dbData = cur.fetchone() # get the last row if it exists
     except:
-        dbData = None
+        dbData = None # if there is no data, set dbData to None
+
     # create a string with column names
     col_list = [f'"{col[0]}"' for col in cur.description]
     columns = ", ".join(col_list)
@@ -92,8 +92,7 @@ def append_table(table, message, dBirth=False, dDeath=False):
     # create a string with values
     values = []
 
-    if dDeath:
-        # values[col_list.index('"Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"')] = 'DDEATH, DATA IS STALE'
+    if dDeath: # if the message is a death message
         for value in dbData:
             value = str(value)
             if ('programm' and 'parts') in value.lower():
@@ -118,9 +117,9 @@ def append_table(table, message, dBirth=False, dDeath=False):
         if len(values) != len(col_list):
             print("Error: DB and MQTT payloads have different number of columns")
             return
-        elif dbData is None:
+        elif dbData is None: # if there is no data in the DB
             pass
-        elif all([str(dbData[i]) == values[i][1:-1] for i in range(len(values))]):
+        elif all([str(dbData[i]) == values[i][1:-1] for i in range(len(values))]): # if the data is the same
             return
 
     # convert list to string
@@ -133,12 +132,12 @@ def append_table(table, message, dBirth=False, dDeath=False):
         print("row_insert error: ", error)
 
 
-# MAIN
+# setup MQTT client, callbacks and connection
 qos = 2
 client = mqtt.Client("Historian", False)
-# callback functions
 client.on_connect = on_connect
 client.on_message = on_message
 client.connect(mqttBroker, 1883, 60)
+
 while True:
     client.loop()
