@@ -43,7 +43,12 @@ while running:
 
     columns = []
     for i,row in colnames.iterrows():
-        dtype = "text" if row["datatype"] == "str" else "numeric"
+        if row["datatype"] == "str":
+            dtype = "text"
+        elif row["datatype"] == "int":
+            dtype = "int8"
+        elif row["datatype"] == "float":
+            dtype = "float8"
         columns.append(f'"{row[1]}" {dtype}, ')
     if sheet == "Static":
         columns.append('"IP_address" text')
