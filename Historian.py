@@ -104,9 +104,9 @@ def append_table(table, message, dBirth=False, dDeath=False):
     values = []
 
     if dDeath: # if the message is a death message
-        for value in dbData:
+        for value, col in zip(dbData, col_list):
             value = str(value)
-            if ('programm' and 'parts') in value.lower():
+            if col == "Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)":
                 values.append("'DDEATH, DATA IS STALE'")
             else:
                 values.append(f"'{value}'")
