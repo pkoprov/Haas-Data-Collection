@@ -46,8 +46,19 @@ def on_message(client, userdata, msg):
             # insert data into DB
             append_table(tokens[4], inboundPayload, dBirth=True)
         elif tokens[2] == "NDEATH":
+            try:
+                # read whar devices are connected to the EoN
+                cur.execute('SELECT "Devices" FROM "AML"."EoN" WHERE "Nodename" = %s', (tokens[3],))  # get the last row
+                conn.commit()
+            except (Exception, pg.DatabaseError) as error:
+                print("DB query error: ", error)
+            devices = cur.fetchone()
+            for dev in devices:
+                append_table(dev, None, dDeath=True)
+                print("death published to DB for device: ", dev)
             print('Action has not been implemented yet')
         elif tokens[2] == "DDEATH":
+            append_table(tokens[4], None, dDeath=True)
             append_table(tokens[4], inboundPayload, dDeath=True)
         elif tokens[2] == "NDATA":
             print('Action has not been implemented yet')
