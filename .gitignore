@@ -1,6 +1,5 @@
 *.pdf
-.idea/
+.idea/*
 test.*
 *.dwg
 *.log
-.idea
