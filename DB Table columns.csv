@@ -50,5 +50,4 @@
 ?Q600 5041,Present work coordinate position X,float
 ?Q600 5042,Present work coordinate position Y,float
 ?Q600 5043,Present work coordinate position Z,float
-?Q600 8552,Maximum recorded vibrations,float
 ?Q600 13013,Coolant level,float
