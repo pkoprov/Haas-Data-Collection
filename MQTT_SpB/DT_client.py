@@ -17,8 +17,9 @@ def on_connect(client, userdata, flags, rc):
 
 
 def on_message(client, userdata, msg):
+    global inboundPayload
     print("Message arrived: " + msg.topic)
-
+    global inboundPayload
     if msg.topic == 'spBv1.0/FWH2200/DDATA/RPI-VF-2-1/VF-2_1' :  # check if the message is for this topic
         inboundPayload = sparkplug_b_pb2.Payload()  # create a payload object
         inboundPayload.ParseFromString(msg.payload)  # parse the payload into the payload object
