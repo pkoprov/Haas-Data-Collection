@@ -59,6 +59,12 @@ def getDdata():
     payload = sparkplug.getDdataPayload()
     n = 1
     # Add device metrics
+    for mac in mac_list:
+        try:
+            tn.write(mac)
+        except:
+            print(f"Telnet connection failed! Could not write {mac} to CNC machine")
+            raise ConnectionError
     for par in par_list: # iterate through the parameters
         code = par[-1].encode() + b"\n"
         try:
@@ -245,6 +251,8 @@ for i, par in enumerate(parameters):
         data_type = MetricDataType.Int32
     par_list.append((name, data_type, code))
 par_list = tuple(par_list)
+
+mac_list = [b"?E1064 0\n", b"?E1065 0\n", b"?E1066 0\n"]
 
 publishDeviceBirth() # publish birth certificate
 
