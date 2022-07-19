@@ -58,13 +58,17 @@ def on_message(client, userdata, msg):
 def getDdata():
     payload = sparkplug.getDdataPayload()
     n = 1
-    # Add device metrics
+    # send macros to NGC
     for mac in mac_list:
         try:
             tn.write(mac)
         except:
             print(f"Telnet connection failed! Could not write {mac} to CNC machine")
             raise ConnectionError
+
+    tn.read_until(b'>>!\r\n'*len(mac_list), timeout=1) # flush the buffer after macros
+
+    # Add device metrics
     for par in par_list: # iterate through the parameters
         code = par[-1].encode() + b"\n"
         try:
@@ -252,7 +256,7 @@ for i, par in enumerate(parameters):
     par_list.append((name, data_type, code))
 par_list = tuple(par_list)
 
-mac_list = [b"?E1064 0\n", b"?E1065 0\n", b"?E1066 0\n"]
+mac_list = [b"?E1064 0\n", b"?E1065 0\n", b"?E1066 0\n", b"?E3196 5000.0000\n"]
 
 publishDeviceBirth() # publish birth certificate
 
