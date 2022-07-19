@@ -3,7 +3,7 @@ Description=MQTT Spark Plug B Edge of Node client
 
 [Service]
 ExecStart=/usr/bin/python3 -u Node_client.py
-WorkingDirectory=/home/pi/Haas-Data-Collection
+WorkingDirectory=/home/pi/Haas-Data-Collection/MQTT_SpB
 Restart=always
 RestartSec=10s
 User=pi
