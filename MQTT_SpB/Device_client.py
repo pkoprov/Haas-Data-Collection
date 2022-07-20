@@ -1,7 +1,7 @@
 import sys
 
-sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")  # uncomment for Windows
-# sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
+# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")  # uncomment for Windows
+sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
@@ -263,8 +263,8 @@ client.loop_start()
 time.sleep(0.1)
 
 # read required parameters from csv file
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:  # uncomment for Windows
-    # with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:  # uncomment for Raspberry Pi
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:  # uncomment for Windows
+with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:  # uncomment for Raspberry Pi
     parameters = text.read().split('\n')[:-1]
 
 # create parameter tuples
