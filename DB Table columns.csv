@@ -14,7 +14,7 @@
 ?Q403,M30 Parts Counter #2 (resettable at control),int
 ?Q500,Three-in-one (PROGRAM; Oxxxxx; STATUS; PARTS; xxxxx),str
 ?Q600 1064,Max axis load for X,float
-?Q600 1065,Max axis load for Z,float
+?Q600 1066,Max axis load for Z,float
 ?Q600 1098,Spindle load with Haas vector drive (read only),float
 ?Q600 1801,Max recorded vibrations of tool 1,float
 ?Q600 1802,Max recorded vibrations of tool 2,float
