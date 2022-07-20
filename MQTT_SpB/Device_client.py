@@ -58,15 +58,6 @@ def on_message(client, userdata, msg):
 def getDdata():
     payload = sparkplug.getDdataPayload()
     n = 1
-    # send macros to NGC
-    for mac in mac_list:
-        try:
-            tn.write(mac)
-        except:
-            print(f"Telnet connection failed! Could not write {mac} to CNC machine")
-            raise ConnectionError
-
-    tn.read_until(b'>>!\r\n'*len(mac_list), timeout=1) # flush the buffer after macros
 
     # Add device metrics
     for par in par_list: # iterate through the parameters
@@ -100,6 +91,15 @@ def getDdata():
         addMetric(payload, par[0], None, par[1], value)
         n += 1
 
+    # send macros to NGC
+    for mac in mac_list:
+        try:
+            tn.write(mac)
+        except:
+            print(f"Telnet connection failed! Could not write {mac} to CNC machine")
+            raise ConnectionError
+
+    tn.read_until(b'>>!\r\n' * len(mac_list), timeout=1)  # flush the buffer after macros
     return payload
 
 
