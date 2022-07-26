@@ -37,6 +37,7 @@ def on_message(client, userdata, msg):
     tokens = msg.topic.split("/")
 
     if tokens[0] == "spBv1.0" and tokens[1] == myGroupId: # check if the message is for this group
+        global inboundPayload
         inboundPayload = sparkplug_b_pb2.Payload()  # create a payload object
         try:
             inboundPayload.ParseFromString(msg.payload)  # parse the payload into the payload object
