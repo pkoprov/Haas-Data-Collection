@@ -1,7 +1,7 @@
 import sys
 
-sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb") # uncomment for Windows
-# sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
+# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb") # uncomment for Windows
+sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
@@ -145,7 +145,7 @@ def publishDeviceBirth():
         print("Could not get data from CNC machine")
         tn.close()
         sys.exit()
-    
+
     if ammeter:
         currentIrms = ammeter.Irms()
         [addMetric(payload, "Electric current/Phase_%s" % (n+1), None, MetricDataType.Float, i)
@@ -224,8 +224,8 @@ def publishDeviceDeath():
 
 
 # read data specific to setup and machines
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
-# with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment for Raspberry Pi
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
+with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment for Raspberry Pi
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
@@ -233,7 +233,6 @@ with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") 
     CNC_host = config.readline().split(" = ")[1].replace("\n", "")
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
-
 
 try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
@@ -264,8 +263,8 @@ client.loop_start()
 time.sleep(0.1)
 
 # read required parameters from csv file
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text: # uncomment for Windows
-# with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:    # uncomment for Raspberry Pi
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text: # uncomment for Windows
+with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:    # uncomment for Raspberry Pi
     parameters = text.read().split('\n')[:-1]
 
 # create parameter tuples
@@ -285,7 +284,7 @@ for i, par in enumerate(parameters):
     par_list.append((name, data_type, code))
 par_list = tuple(par_list)
 
-mac_list = [b"?E1064 0\n", b"?E1065 0\n", b"?E1066 0\n"]#, b"?E3196 5000.0000\n"]
+mac_list = b"?E1064 -1\n?E1065 -1\n?E3196 5000.0000\n"
 
 publishDeviceBirth() # publish birth certificate
 
