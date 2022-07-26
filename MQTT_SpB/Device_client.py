@@ -93,6 +93,8 @@ def getDdata():
             val_list[n] = bool(float(val_list[n]))
         elif par[1] == 12:  # string
             val_list[n] = str(val_list[n])
+        if "Max axis load" in par[0] and val_list[n] == -1:
+            continue
         addMetric(payload, par[0], None, par[1], val_list[n])
 
     # send macros to NGC
@@ -144,9 +146,6 @@ def publishDeviceBirth():
         tn.close()
         sys.exit()
 
-    addMetric(payload, "Device Control/Rebirth", None, MetricDataType.Boolean, False)
-    addMetric(payload, "Device Control/Reboot", None, MetricDataType.Boolean, False)
-
     totalByteArray = payload.SerializeToString()
     # Publish the initial data with the Device BIRTH certificate
     client.publish("spBv1.0/" + myGroupId + "/DBIRTH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2,
@@ -166,15 +165,19 @@ def publishDeviceData():
         tn.close()
         publishDeviceDeath()
         sys.exit()
-
-    for i, metric in enumerate(
-            payload.metrics):  # iterate through new metrics values to find if there was a change
+    
+    # iterate through new metrics values to find if there was a change
+    for i, metric in enumerate(payload.metrics):  
         if metric.name in ['Year, month, day', 'Hour, minute, second', 'Power-on Time (total)',
                            'Power on timer (read only)']:  # ignore these metrics
             continue
-        else:
-            previous_metric = [met for met in previous_Ddata.metrics if met.name == metric.name][
-                0]  # find previous metric matching current metric
+        else:  # find previous metric matching current metric
+            try:
+                previous_metric = [prev_met for prev_met in previous_Ddata.metrics if prev_met.name == metric.name][0]
+            except:
+                print(f"\nDevice metric has been added:\n{metric}")
+                stale = False
+                break
             if metric.name == "Coolant level" and abs(
                     metric.float_value - previous_metric.float_value) < 2:  # if coolant level is stable
                 stale = True
@@ -191,7 +194,7 @@ def publishDeviceData():
                 stale = False
                 break
     if stale:
-        pass
+        return
 
     else:
         totalByteArray = payload.SerializeToString()
