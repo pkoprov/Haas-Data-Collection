@@ -59,72 +59,80 @@ def on_message(client, userdata, msg):
 # function to get data from NGC
 def getDdata():
     payload = sparkplug.getDdataPayload()
-    n = 1
+
+    code = "".join([par[-1] + "\n" for par in par_list]).encode() + b"|*|\n"
+    try:
+        tn.read_very_eager()  # clear buffer
+        tn.write(code)  # send command
+    except:
+        # if connection fails, try to reconnect
+        print(f"Telnet connection failed! Could not write codes to CNC machine")
+        raise ConnectionError
+    try:
+        msg = tn.read_until(b'|*|', 1)  # read response
+    except:
+        # if connection fails, try to reconnect
+        print(f"Telnet connection failed! Could not read from CNC machine")
+        raise ConnectionError
+    if b"|*|" in msg:
+        msg = msg[:-10]
+    else:
+        print(f"Telnet connection failed! Could not read all message from CNC machine")
+        raise ConnectionError
+    try:
+        val_list = parse(msg, par_list)  # parse response
+    except ValueError:
+        print(f"{n} Empty value for {par[0]}")
+        raise ConnectionError
 
     # Add device metrics
-    for par in par_list: # iterate through the parameters
-        code = par[-1].encode() + b"\n"
-        try:
-            tn.read_very_eager() # clear buffer
-            tn.write(code) # send command
-        except:
-            # if connection fails, try to reconnect
-            print(f"Telnet connection failed! Could not write {code} ({par[0]}) to CNC machine")
-            raise ConnectionError
-        try:
-            msg = tn.read_until(b'\n', 1) # read response
-        except:
-            # if connection fails, try to reconnect
-            print(f"Telnet connection failed! Could not read from CNC machine")
-            raise ConnectionError
-        try:
-            value = parse(msg, par[0]) # parse response
-        except ValueError:
-            print(f"{n} Empty value for {par[0]}")
-            raise ConnectionError
+    for n, par in enumerate(par_list):  # iterate through the parameters
         if par[1] == 3:  # int
-            value = int(float(value))
+            val_list[n] = int(float(val_list[n]))
         elif par[1] == 9:  # float
-            value = float(value)
+            val_list[n] = float(val_list[n])
         elif par[1] == 11:  # boolean
-            value = bool(float(value))
+            val_list[n] = bool(float(val_list[n]))
         elif par[1] == 12:  # string
-            value = str(value)
-        addMetric(payload, par[0], None, par[1], value)
-        n += 1
+            val_list[n] = str(val_list[n])
+        addMetric(payload, par[0], None, par[1], val_list[n])
 
     # send macros to NGC
-    for mac in mac_list:
-        try:
-            tn.write(mac)
-        except:
-            print(f"Telnet connection failed! Could not write {mac} to CNC machine")
-            raise ConnectionError
+    try:
+        tn.write(mac_list)
+    except:
+        print(f"Telnet connection failed! Could not write {mac} to CNC machine")
+        raise ConnectionError
 
-    tn.read_until(b'>>!\r\n' * len(mac_list), timeout=1)  # flush the buffer after macros
+    tn.read_until(b'>>!\r\n' * len(mac_list.split(b"\n")[:-1]), timeout=1)  # flush the buffer after macros
     return payload
 
 
 # function to parse output of CNC machine from telnet port
-def parse(telnetdata, par_name):
-    msg = telnetdata.decode()[:-2].replace('>', '').split(', ')
+def parse(telnetdata, par_list):
+    val_list = []
+    msg_lst = telnetdata.decode().replace(">", "").split("\r\n")
 
-    if len(msg) == 2 and msg[1] != "?":  # if value exists
-        if 'year' in par_name.lower():
-            val = time.strftime("%Y/%m/%d", time.strptime(msg[1][:-2], "%y%m%d"))
-        elif 'hour' in par_name.lower():
-            val = time.strftime("%H:%M:%S", time.strptime(msg[1][:-2], "%H%M%S"))
-        elif 'rpm' in par_name.lower():
-            val = int(float(msg[1]))
+    for msg, par in zip(msg_lst, par_list):
+        msg = msg.split(", ")
+
+        if len(msg) == 2 and msg[1] != "?":  # if value exists
+            if 'year' in par[0].lower():
+                val = time.strftime("%Y/%m/%d", time.strptime(msg[1][:-2], "%y%m%d"))
+            elif 'hour' in par[0].lower():
+                val = time.strftime("%H:%M:%S", time.strptime(msg[1][:-2], "%H%M%S"))
+            elif 'rpm' in par[0].lower():
+                val = int(float(msg[1]))
+            else:
+                val = msg[1]
+        elif ('program' and "parts") in ''.join(msg).lower():
+            val = ', '.join(msg)
+        elif 'busy' in ''.join(msg).lower():
+            val = "BUSY"
         else:
-            val = msg[1]
-    elif ('program' and "parts") in ''.join(msg).lower():
-        val = ', '.join(msg)
-    elif 'busy' in ''.join(msg).lower():
-        val = "BUSY"
-    else:
-        raise ValueError("No value found for parameter: " + par_name)
-    return val
+            raise ValueError("No value found for parameter: " + par[0])
+        val_list.append(val)
+    return val_list
 
 
 # function to publish device birth certificate
