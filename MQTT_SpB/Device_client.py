@@ -8,6 +8,9 @@ from sparkplug_b import *
 import time
 import telnetlib
 import paho.mqtt.client as mqtt
+import serial
+from serial.tools.list_ports import comports
+from Irms import Irms
 
 
 ######################################################################
@@ -135,9 +138,18 @@ def publishDeviceBirth():
         print("Could not get data from CNC machine")
         tn.close()
         sys.exit()
-
+    
+    try:
+        ampIrms = Irms(ser)
+    except:
+        print("Could not retrieve current amps")
+        ampIrms = None
+        
     addMetric(payload, "Device Control/Rebirth", None, MetricDataType.Boolean, False)
     addMetric(payload, "Device Control/Reboot", None, MetricDataType.Boolean, False)
+         
+    [addMetric(payload, "Electric current/Phase_%s" % (n+1), None, MetricDataType.Float, i)
+     for n, i in enumerate(ampIrms) if ampIrms and len(ampIrms) == 3]
 
     totalByteArray = payload.SerializeToString()
     # Publish the initial data with the Device BIRTH certificate
@@ -217,11 +229,23 @@ with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment fo
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
 
+
 try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
 except:
     print("Cannot connect to CNC machine")
     sys.exit()
+
+for port in comports():
+    if "CP2102" in port[1]:
+        try:
+            ser = serial.Serial(port[0], 115200, timeout = 1)
+            print('Connected to USB device "%s..."' % port[1][:50])
+            break
+        except:
+            print("Could not connect to USB port")
+            ser = None
+            break
 
 qos = 2
 ret = True
