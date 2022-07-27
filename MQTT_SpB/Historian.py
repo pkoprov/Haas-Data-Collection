@@ -104,18 +104,22 @@ def append_table(table, message, dBirth=False, dDeath=False):
         values = tuple([f"{val}" for val in dbData.values[0]])
 
     else:
+        # create a dict with values
+        val_dic = {}
+
         for metric in message.metrics:
             if metric.name in columns:
                 if 'Three-in-one' in metric.name and dBirth:
-                    values.append("'DBIRTH'")
+                    val_dic[metric.name] = ("'DBIRTH'")
+                    break
                 elif metric.datatype == MetricDataType.Float:
-                    values.append(f"'{metric.float_value}'")
+                    val_dic[metric.name] = (f"{metric.float_value}")
                 elif metric.datatype == MetricDataType.String:
-                    values.append(f"'{metric.string_value}'")
+                    val_dic[metric.name] = (f"{metric.string_value}")
                 elif metric.datatype == MetricDataType.Int32:
-                    values.append(f"'{metric.int_value}'")
+                    val_dic[metric.name] = (f"{metric.int_value}")
                 elif metric.datatype == MetricDataType.Boolean:
-                    values.append(f"'{metric.boolean_value}'")
+                    val_dic[metric.name] = (f"{metric.boolean_value}")
 
         # check if the last DB row is the same as the current messages
         if len(values) != len(col_list):
