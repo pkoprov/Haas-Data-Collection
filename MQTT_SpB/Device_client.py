@@ -296,4 +296,3 @@ publishDeviceBirth()  # publish birth certificate
 
 while True:
     publishDeviceData()  # publish data if data has changed
-    time.sleep(0.1)
