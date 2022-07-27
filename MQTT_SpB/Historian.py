@@ -122,20 +122,17 @@ def append_table(table, message, dBirth=False, dDeath=False):
                     val_dic[metric.name] = (f"{metric.boolean_value}")
 
         # check if the last DB row is the same as the current messages
-        if len(values) != len(col_list):
-            print("Error: DB and MQTT payloads have different number of columns")
-            return
-        elif dbData is None: # if there is no data in the DB
-            pass
-        elif all([str(dbData[i]) == values[i][1:-1] for i in range(len(values))]): # if the data is the same
+        if all([f"{dbData[key][0]}" == val for key, val in val_dic.items()]):
             return
 
-    # convert list to string
-    values = ", ".join(values)
+        values = tuple([f"{val}" for val in val_dic.values()])
+        columns = ", ".join([f'"{key}"' for key in val_dic.keys()])
 
     try:
         # commit insert query
-        insert_CMD(table, columns, values)
+        CMD = f'INSERT INTO "AML"."{table}" ({columns}) VALUES {values}'
+        cur.execute(CMD)
+        conn.commit()
     except (Exception, pg.DatabaseError) as error:
         print("row_insert error: ", error)
 
