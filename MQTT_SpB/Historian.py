@@ -8,17 +8,18 @@ sys.path.insert(0, r'C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb')
 
 from sparkplug_b import *
 
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\historian.config", 'r') as config: # uncomment for Windows
+with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\historian.config",
+          'r') as config:  # uncomment for Windows
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     dbName = config.readline().split(" = ")[1].replace("\n", "")
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
 
-conn = pg.connect(f"dbname={dbName} user={myUsername} password={myPassword}") # connect to DB
+conn = pg.connect(f"dbname={dbName} user={myUsername} password={myPassword}")  # connect to DB
 
 try:
-    cur = conn.cursor() # create a cursor object
+    cur = conn.cursor()  # create a cursor object
     print("Subscriber connection established")
 except (Exception, pg.DatabaseError) as error:
     print(error)
@@ -26,7 +27,7 @@ except (Exception, pg.DatabaseError) as error:
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        client.subscribe("spBv1.0/" + myGroupId + "/#", qos) # subscribe to all topics in the group
+        client.subscribe("spBv1.0/" + myGroupId + "/#", qos)  # subscribe to all topics in the group
         print("Connected with result code " + str(rc))
     else:
         print("Failed to connect with result code " + str(rc))
@@ -37,7 +38,7 @@ def on_message(client, userdata, msg):
     print("Message arrived: " + msg.topic)
     tokens = msg.topic.split("/")
 
-    if tokens[0] == "spBv1.0" and tokens[1] == myGroupId: # check if the message is for this group
+    if tokens[0] == "spBv1.0" and tokens[1] == myGroupId:  # check if the message is for this group
         global inboundPayload
         inboundPayload = sparkplug_b_pb2.Payload()  # create a payload object
         try:
@@ -93,7 +94,6 @@ def append_table(table, message, dBirth=False, dDeath=False):
     except (Exception, pg.DatabaseError) as error:
         print("DB query error: ", error)
         return
-
 
     # create a string with column names
     col_list = [f'"{col}"' for col in dbData.columns]
