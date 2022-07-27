@@ -1,6 +1,7 @@
 import sys
 
 import paho.mqtt.client as mqtt
+import pandas as pd
 import psycopg2 as pg
 
 sys.path.insert(0, r'C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb')  # uncomment for Windows
@@ -84,39 +85,24 @@ def on_message(client, userdata, msg):
         print("Unknown message...")
 
 
-def insert_CMD(table, columns, values):
-    CMD = f'INSERT INTO "AML"."{table}" ({columns}) VALUES ({values})'
-    cur.execute(CMD)
-    conn.commit()
-
-
 def append_table(table, message, dBirth=False, dDeath=False):
     try:
         # read column names for the current table
-        cur.execute(f'SELECT * FROM "AML"."{table}" order by "Power on timer (read only)" desc limit 1') # get the last row
-        conn.commit()
+        dbData = pd.read_sql_query(f'SELECT * FROM "AML"."{table}" order by "Power on timer (read only)" desc limit 1',
+                                   conn)
     except (Exception, pg.DatabaseError) as error:
         print("DB query error: ", error)
+        return
 
-    try:
-        dbData = cur.fetchone() # get the last row if it exists
-    except:
-        dbData = None # if there is no data, set dbData to None
 
     # create a string with column names
-    col_list = [f'"{col[0]}"' for col in cur.description]
+    col_list = [f'"{col}"' for col in dbData.columns]
     columns = ", ".join(col_list)
 
-    # create a string with values
-    values = []
+    if dDeath:  # if the message is a death certificate
+        dbData["Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"] = "DDEATH, DATA IS STALE"
+        values = tuple([f"{val}" for val in dbData.values[0]])
 
-    if dDeath: # if the message is a death message
-        for value, col in zip(dbData, col_list):
-            value = str(value)
-            if col == "Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)":
-                values.append("'DDEATH, DATA IS STALE'")
-            else:
-                values.append(f"'{value}'")
     else:
         for metric in message.metrics:
             if metric.name in columns:
