@@ -258,8 +258,6 @@ for port in comports():
         print("Could not connect to USB port")
         ammeter = None
 
-print(ammeter.Irms())
-
 qos = 2
 ret = True
 client = mqtt.Client(myDeviceName, clean_session=True)
@@ -299,3 +297,5 @@ publishDeviceBirth()  # publish birth certificate
 
 while True:
     publishDeviceData()  # publish data if data has changed
+    time.sleep(0.1)
+    
