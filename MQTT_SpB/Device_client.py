@@ -1,14 +1,14 @@
 import sys
 
-# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb") # uncomment for Windows
-sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
+sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb") # uncomment for Windows
+# sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
 import time
 import telnetlib
-import paho.mqtt.client as mqtt
 from serial.tools.list_ports import comports
+sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\MQTT_SpB") # uncomment for Windows
 from powerMeter import PowerMeter
 
 
@@ -138,17 +138,10 @@ def publishDeviceBirth():
         tn.close()
         sys.exit()
     
-    try:
-        ampIrms = Irms(ser)
-    except:
-        print("Could not retrieve current amps")
-        ampIrms = None
-        
-    addMetric(payload, "Device Control/Rebirth", None, MetricDataType.Boolean, False)
-    addMetric(payload, "Device Control/Reboot", None, MetricDataType.Boolean, False)
-         
-    [addMetric(payload, "Electric current/Phase_%s" % (n+1), None, MetricDataType.Float, i)
-     for n, i in enumerate(ampIrms) if ampIrms and len(ampIrms) == 3]
+    if ammeter:
+        currentIrms = ammeter.Irms()
+        [addMetric(payload, "Electric current/Phase_%s" % (n+1), None, MetricDataType.Float, i)
+         for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
 
     totalByteArray = payload.SerializeToString()
     # Publish the initial data with the Device BIRTH certificate
@@ -197,6 +190,11 @@ def publishDeviceData():
         pass
 
     else:
+        if ammeter:
+            currentIrms = ammeter.Irms()
+            [addMetric(payload, "Electric current/Phase_%s" % (n + 1), None, MetricDataType.Float, i)
+             for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
+
         totalByteArray = payload.SerializeToString()
         # Publish the initial data with the Device BIRTH certificate
         client.publish("spBv1.0/" + myGroupId + "/DDATA/" + myNodeName + "/" + myDeviceName, totalByteArray, 2, True)
@@ -218,8 +216,8 @@ def publishDeviceDeath():
 
 
 # read data specific to setup and machines
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment for Raspberry Pi
+with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
+# with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment for Raspberry Pi
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
@@ -233,21 +231,18 @@ try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
 except:
     print("Cannot connect to CNC machine")
-    sys.exit()
+    # sys.exit()
 
 for port in comports():
     if "CP210" in port[1]:
         try:
-            ammeter = powerMeter(port[0])
+            ammeter = PowerMeter(port[0])
             print('Connected to USB device "%s..."' % port[1][:50])
             break
         except:
             print("Could not connect to USB port")
-            ser = None
+            ammeter = None
             break
-
-print(ammeter.Irms())
-sys.exit()
 
 qos = 2
 ret = True
@@ -261,8 +256,8 @@ client.loop_start()
 time.sleep(0.1)
 
 # read required parameters from csv file
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text: # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:    # uncomment for Raspberry Pi
+with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text: # uncomment for Windows
+# with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:    # uncomment for Raspberry Pi
     parameters = text.read().split('\n')[:-1]
 
 # create parameter tuples
