@@ -148,10 +148,7 @@ def publishDeviceBirth():
         tn.close()
         sys.exit()
 
-    if ammeter:
-        currentIrms = ammeter.Irms()
-        [addMetric(payload, "Electric current/Phase_%s" % (n+1), None, MetricDataType.Float, i)
-         for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
+    addPowerData(payload)
 
     totalByteArray = payload.SerializeToString()
     # Publish the initial data with the Device BIRTH certificate
@@ -204,10 +201,7 @@ def publishDeviceData():
         return
 
     else:
-        if ammeter:
-            currentIrms = ammeter.Irms()
-            [addMetric(payload, "Electric current/Phase_%s" % (n + 1), None, MetricDataType.Float, i)
-             for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
+        addPowerData(payload)
 
         totalByteArray = payload.SerializeToString()
         # Publish the initial data with the Device BIRTH certificate
@@ -229,6 +223,15 @@ def publishDeviceDeath():
     sys.exit()
 
 
+def addPowerData(payload):
+    if ammeter and ammeter.ready() > 0:
+        currentIrms = ammeter.Irms()
+        [addMetric(payload, "Electric current/Phase_%s" % (n + 1), None, MetricDataType.Float, i)
+        for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
+    else:
+        print("Check power meter!!!")
+    
+    
 # read data specific to setup and machines
 # with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
 with open("/home/pi/Haas-Data-Collection/Node.config") as config:  # uncomment for Raspberry Pi
@@ -257,6 +260,8 @@ for port in comports():
     else:
         print("Could not connect to USB port")
         ammeter = None
+
+time.sleep(1)
 
 qos = 2
 ret = True
