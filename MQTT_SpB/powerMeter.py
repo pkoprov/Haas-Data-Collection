@@ -6,7 +6,7 @@ class PowerMeter:
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
-        self.ser = serial.Serial(port, baudrate)
+        self.ser = serial.Serial(port, baudrate, timeout = timeout)
         print("Serial port is connected")
 
     def Irms(self):
@@ -17,3 +17,6 @@ class PowerMeter:
         except ValueError:
             return None
         return tuple(data)
+    
+    def ready(self):
+        return self.ser.in_waiting
