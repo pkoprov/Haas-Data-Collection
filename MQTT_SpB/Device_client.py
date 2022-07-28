@@ -8,9 +8,8 @@ from sparkplug_b import *
 import time
 import telnetlib
 import paho.mqtt.client as mqtt
-import serial
 from serial.tools.list_ports import comports
-from Irms import Irms
+from powerMeter import PowerMeter
 
 
 ######################################################################
@@ -237,15 +236,18 @@ except:
     sys.exit()
 
 for port in comports():
-    if "CP2102" in port[1]:
+    if "CP210" in port[1]:
         try:
-            ser = serial.Serial(port[0], 115200, timeout = 1)
+            ammeter = powerMeter(port[0])
             print('Connected to USB device "%s..."' % port[1][:50])
             break
         except:
             print("Could not connect to USB port")
             ser = None
             break
+
+print(ammeter.Irms())
+sys.exit()
 
 qos = 2
 ret = True
