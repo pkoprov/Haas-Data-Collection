@@ -1,6 +1,5 @@
 import sys
 
-# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb")  # uncomment for Windows
 sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
 import sparkplug_b as sparkplug
@@ -8,7 +7,8 @@ from sparkplug_b import *
 import time
 import telnetlib
 from serial.tools.list_ports import comports
-sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\MQTT_SpB") # uncomment for Windows
+import paho.mqtt.client as mqtt
+# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\MQTT_SpB") # uncomment for Windows
 from powerMeter import PowerMeter
 
 
@@ -231,7 +231,7 @@ def publishDeviceDeath():
 
 # read data specific to setup and machines
 # with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/Node.config") as config:  # uncomment for Raspberry Pi
+with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment for Raspberry Pi
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
@@ -244,7 +244,7 @@ try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
 except:
     print("Cannot connect to CNC machine")
-    # sys.exit()
+    sys.exit()
 
 for port in comports():
     if "CP210" in port[1]:
@@ -253,9 +253,12 @@ for port in comports():
             print('Connected to USB device "%s..."' % port[1][:50])
             break
         except:
-            print("Could not connect to USB port")
-            ammeter = None
-            break
+            pass
+    else:
+        print("Could not connect to USB port")
+        ammeter = None
+
+print(ammeter.Irms())
 
 qos = 2
 ret = True
@@ -269,8 +272,8 @@ client.loop_start()
 time.sleep(0.1)
 
 # read required parameters from csv file
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:  # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:  # uncomment for Raspberry Pi
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text: # uncomment for Windows
+with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:    # uncomment for Raspberry Pi
     parameters = text.read().split('\n')[:-1]
 
 # create parameter tuples

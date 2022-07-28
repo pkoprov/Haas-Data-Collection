@@ -7,6 +7,7 @@ class PowerMeter:
         self.baudrate = baudrate
         self.timeout = timeout
         self.ser = serial.Serial(port, baudrate)
+        print("Serial port is connected")
 
     def Irms(self):
         self.ser.flushInput()
