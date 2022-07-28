@@ -174,7 +174,7 @@ def publishDeviceData():
         sys.exit()
 
     # iterate through new metrics values to find if there was a change
-    for i, metric in enumerate(payload.metrics):
+    for i, metric in enumerate(payload.metrics):  
         if metric.name in ['Year, month, day', 'Hour, minute, second', 'Power-on Time (total)',
                            'Power on timer (read only)']:  # ignore these metrics
             continue
@@ -231,7 +231,7 @@ def publishDeviceDeath():
 
 # read data specific to setup and machines
 # with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/Node.config") as config: # uncomment for Raspberry Pi
+with open("/home/pi/Haas-Data-Collection/Node.config") as config:  # uncomment for Raspberry Pi
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     myNodeName = config.readline().split(" = ")[1].replace("\n", "")
@@ -270,8 +270,8 @@ client.loop_start()
 time.sleep(0.1)
 
 # read required parameters from csv file
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text: # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:    # uncomment for Raspberry Pi
+# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:  # uncomment for Windows
+with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:  # uncomment for Raspberry Pi
     parameters = text.read().split('\n')[:-1]
 
 # create parameter tuples
