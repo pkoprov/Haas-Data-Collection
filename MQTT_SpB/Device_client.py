@@ -301,7 +301,7 @@ for i, par in enumerate(parameters):
     par_list.append((name, data_type, code))
 par_list = tuple(par_list)
 
-mac_list = b"?E1064 -1\n?E1065 -1\n?E1066 -1\n?E3196 5000.0000\n"
+mac_list = b"?E1064 -1\n?E1066 -1\n?E3196 5000.0000\n"
 
 publishDeviceBirth()  # publish birth certificate
 
