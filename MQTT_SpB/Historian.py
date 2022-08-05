@@ -89,19 +89,19 @@ def on_message(client, userdata, msg):
 def append_table(table, message, dBirth=False, dDeath=False):
     try:
         # read column names for the current table
-        dbData = pd.read_sql_query(f'SELECT * FROM "AML"."{table}" order by "Power on timer (read only)" desc limit 1',
-                                   conn)
+        dbData = pd.read_sql_query(f'SELECT * FROM "AML"."{table}" order by "timestamp" desc limit 1',
+                                   conn).squeeze()
     except (Exception, pg.DatabaseError) as error:
         print("DB query error: ", error)
         return
 
     # create a string with column names
-    col_list = [f'"{col}"' for col in dbData.columns]
-    columns = ", ".join(col_list)
+    columns = ", ".join([f'"{col}"' for col in dbData.index])
+    dbData.dropna(inplace=True) # drop all columns with NaN
 
     if dDeath:  # if the message is a death certificate
-        dbData["Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"] = "DDEATH, DATA IS STALE"
-        values = tuple([f"{val}" for val in dbData.values[0]])
+        val_dic = dbData.to_dict()
+        val_dic["Three-in-one (PROGRAM, Oxxxxx, STATUS, PARTS, xxxxx)"] = "DDEATH, DATA IS STALE"
 
     else:
         # create a dict with values
@@ -110,7 +110,7 @@ def append_table(table, message, dBirth=False, dDeath=False):
         for metric in message.metrics:
             if metric.name in columns:
                 if 'Three-in-one' in metric.name and dBirth:
-                    val_dic[metric.name] = ("'DBIRTH'")
+                    val_dic[metric.name] = 'DBIRTH'
                     break
                 elif metric.datatype == MetricDataType.Float:
                     val_dic[metric.name] = (f"{metric.float_value}")
@@ -121,12 +121,14 @@ def append_table(table, message, dBirth=False, dDeath=False):
                 elif metric.datatype == MetricDataType.Boolean:
                     val_dic[metric.name] = (f"{metric.boolean_value}")
 
-        # check if the last DB row is the same as the current messages
-        if all([f"{dbData[key][0]}" == val for key, val in val_dic.items()]):
-            return
+    val_dic["timestamp"] = f"{message.timestamp}"
 
-        values = tuple([f"{val}" for val in val_dic.values()])
-        columns = ", ".join([f'"{key}"' for key in val_dic.keys()])
+    # check if the last DB row is the same as the current messages
+    if dbData.to_dict() == val_dic:
+        return
+
+    values = tuple([f"{val}" for val in val_dic.values()])
+    columns = ", ".join([f'"{key}"' for key in val_dic.keys()])
 
     try:
         # commit insert query
@@ -135,6 +137,7 @@ def append_table(table, message, dBirth=False, dDeath=False):
         conn.commit()
     except (Exception, pg.DatabaseError) as error:
         print("row_insert error: ", error)
+        conn.rollback()
 
 
 # setup MQTT client, callbacks and connection
