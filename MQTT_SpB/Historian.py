@@ -96,7 +96,7 @@ def append_table(table, message, dBirth=False, dDeath=False):
 
     # create a string with column names
     columns = ", ".join([f'"{col}"' for col in dbData.index])
-    dbData.dropna(inplace=True) # drop all columns with NaN
+    dbData.dropna(inplace=True)  # drop all columns with NaN
 
     if dDeath:  # if the message is a death certificate
         val_dic = dbData.to_dict()
@@ -120,7 +120,10 @@ def append_table(table, message, dBirth=False, dDeath=False):
                 elif metric.datatype == MetricDataType.Boolean:
                     val_dic[metric.name] = (f"{metric.boolean_value}")
 
-    val_dic["timestamp"] = f"{message.timestamp}"
+    try:
+        val_dic["timestamp"] = f"{message.timestamp / 1000}"
+    except:
+        print("Timestamp not found for machine: ", table)
 
     # check if the last DB row is the same as the current messages
     if dbData.to_dict() == val_dic:
