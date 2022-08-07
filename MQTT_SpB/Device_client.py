@@ -148,7 +148,7 @@ def publishDeviceBirth():
         tn.close()
         sys.exit()
 
-    addPowerData(payload)
+    addPowerData(payload) if powerMeter else False
 
     totalByteArray = payload.SerializeToString()
     # Publish the initial data with the Device BIRTH certificate
@@ -201,7 +201,7 @@ def publishDeviceData():
         return
 
     else:
-        addPowerData(payload)
+        addPowerData(payload) if powerMeter else False
 
         totalByteArray = payload.SerializeToString()
         # Publish the initial data with the Device BIRTH certificate
@@ -224,13 +224,12 @@ def publishDeviceDeath():
 
 
 def addPowerData(payload):
-    if ammeter and ammeter.ready() > 0:
+    if ammeter.ready() > 0:
         currentIrms = ammeter.Irms()
         [addMetric(payload, "Electric current/Phase_%s" % (n + 1), None, MetricDataType.Float, i)
         for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
-    else:
-        if powerMeter:
-            print("Check power meter!!!")
+    elif powerMeter:
+        print("Check power meter!!!")
     
     
 # read data specific to setup and machines
@@ -243,7 +242,9 @@ with open("/home/pi/Haas-Data-Collection/Node.config") as config:  # uncomment f
     CNC_host = config.readline().split(" = ")[1].replace("\n", "")
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
-    powerMeter = bool(config.readline().split(" = ")[1].replace("\n", ""))
+    powerMeter = config.readline().split(" = ")[1].replace("\n", "")
+
+powerMeter = True if powerMeter.lower() in ("true", 'yes', 'attached', '1') else False
 
 try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
@@ -259,7 +260,8 @@ if powerMeter:
                 print('Connected to USB device "%s..."' % port[1][:50])
                 break
             except:
-                pass
+                powerMeter = False
+                print("Check power meter!!!")
         else:
             print("Could not connect to USB port")
             ammeter = None
