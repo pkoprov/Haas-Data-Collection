@@ -62,12 +62,11 @@ def on_message(client, userdata, msg):
             devices = cur.fetchone()
             try:
                 for dev in devices:
-                    append_table(dev, None, dDeath=True)
+                    append_table(dev, inboundPayload, dDeath=True)
                     print("NDEATH published to DB for device: ", dev)
             except:
                 print("Failed to publish NDEATH to DB for device: ", tokens[3])
         elif tokens[2] == "DDEATH":
-            append_table(tokens[4], None, dDeath=True)
             append_table(tokens[4], inboundPayload, dDeath=True)
         elif tokens[2] == "NDATA":
             print('Action has not been implemented yet')
