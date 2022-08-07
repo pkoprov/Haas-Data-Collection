@@ -229,7 +229,8 @@ def addPowerData(payload):
         [addMetric(payload, "Electric current/Phase_%s" % (n + 1), None, MetricDataType.Float, i)
         for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
     else:
-        print("Check power meter!!!")
+        if powerMeter:
+            print("Check power meter!!!")
     
     
 # read data specific to setup and machines
@@ -242,6 +243,7 @@ with open("/home/pi/Haas-Data-Collection/Node.config") as config:  # uncomment f
     CNC_host = config.readline().split(" = ")[1].replace("\n", "")
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
+    powerMeter = bool(config.readline().split(" = ")[1].replace("\n", ""))
 
 try:
     tn = telnetlib.Telnet(CNC_host, 5051, 3)
@@ -249,17 +251,18 @@ except:
     print("Cannot connect to CNC machine")
     sys.exit()
 
-for port in comports():
-    if "CP210" in port[1]:
-        try:
-            ammeter = PowerMeter(port[0])
-            print('Connected to USB device "%s..."' % port[1][:50])
-            break
-        except:
-            pass
-    else:
-        print("Could not connect to USB port")
-        ammeter = None
+if powerMeter:
+    for port in comports():
+        if "CP210" in port[1]:
+            try:
+                ammeter = PowerMeter(port[0])
+                print('Connected to USB device "%s..."' % port[1][:50])
+                break
+            except:
+                pass
+        else:
+            print("Could not connect to USB port")
+            ammeter = None
 
 time.sleep(1)
 
