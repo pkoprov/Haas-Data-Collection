@@ -17,7 +17,7 @@ from sparkplug_b import *
 ######################################################################
 def device_ping(device_ip, timeout=1):
     global device_online
-    while not device_online:
+    while True:
         if os.system("ping -c 1 " + device_ip + ' | grep "1 received"') == 0: # uncomment for Raspberry Pi
             #         if os.system("ping -c 1 " + device_ip + ' | find "Received = 1"') == 0: # uncomment for Windows
 
@@ -26,6 +26,7 @@ def device_ping(device_ip, timeout=1):
                 os.system("python3 ./Device_client.py")  # uncomment for Raspberry Pi
                 # os.system("python Device_client.py") # uncomment for Windows
                 time.sleep(3)
+                device_online = True
         else:
             if device_online:
                 print("NGC is not reachable")
@@ -91,19 +92,18 @@ def on_message(client, userdata, msg):
                 if tokens[2] == "DBIRTH":
                     print("Device Birth Certificate has been received")
                     dBirthTime = inboundPayload.timestamp
-                    flag = True
+                    device_online = True
 
                 elif tokens[2] == "DDEATH":
                     print("Device Death Certificate has been received")
                     dDeathTime = inboundPayload.timestamp
-                    flag = False
+                    device_online = False
 
                 if all(var in globals().keys() for var in ['dBirthTime', 'dDeathTime']): # if both birth and death certificates have been received
                     if dDeathTime > dBirthTime: # if the death certificate is after the birth certificate
-                        flag = False
+                        device_online = False
                     else:
-                        flag = True
-                device_online = flag # set the device online flag
+                        device_online = True
     else:
         print("Unknown command...")
 
