@@ -17,20 +17,18 @@ from sparkplug_b import *
 ######################################################################
 def device_ping(device_ip, timeout=1):
     global device_online
+    ping = True
     while True:
-        if os.system("ping -c 1 " + device_ip + ' | grep "1 received"') == 0: # uncomment for Raspberry Pi
+        if not device_online:
+            if os.system("ping -c 1 " + device_ip + ' | grep "1 received"') == 0: # uncomment for Raspberry Pi
+                ping = True
             #         if os.system("ping -c 1 " + device_ip + ' | find "Received = 1"') == 0: # uncomment for Windows
-
-            if not device_online:
                 print("Starting of the Device program")
                 os.system("python3 ./Device_client.py")  # uncomment for Raspberry Pi
                 # os.system("python Device_client.py") # uncomment for Windows
-                time.sleep(3)
-                device_online = True
-        else:
-            if device_online:
+            elif ping:
                 print("NGC is not reachable")
-                device_online = False
+                ping = False
             else:
                 pass
         time.sleep(timeout)
@@ -45,9 +43,9 @@ def on_connect(client, userdata, flags, rc):
         client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#", qos)
         client.subscribe("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/#", qos)
         client.subscribe("spBv1.0/" + myGroupId + "/DBIRTH/" + myNodeName + "/#", qos)
-        print("Connected with result code " + str(rc))
+        print("Node connected with result code " + str(rc))
     else:
-        print("Failed to connect with result code " + str(rc))
+        print("Node failed to connect with result code " + str(rc))
         sys.exit()
 
 
@@ -55,6 +53,7 @@ def on_connect(client, userdata, flags, rc):
 # The callback for when a PUBLISH message is received from the server.
 ######################################################################
 def on_message(client, userdata, msg):
+    global inboundPayload
     print("Message arrived: " + msg.topic)
     tokens = msg.topic.split("/")
 
@@ -87,23 +86,21 @@ def on_message(client, userdata, msg):
                         os.system("python3 ./Device_client.py") # uncomment for Raspberry Pi
 
         elif tokens[2] in ("DBIRTH", "DDEATH") and tokens[4] == myDeviceName: # if the message is a device birth or death
-            if time.time() - inboundPayload.timestamp / 1000 < 1: # if the message is within the last second
-                global dBirthTime, dDeathTime, device_online
-                if tokens[2] == "DBIRTH":
-                    print("Device Birth Certificate has been received")
-                    dBirthTime = inboundPayload.timestamp
-                    device_online = True
+#             if time.time() - inboundPayload.timestamp / 1000 < 1: # if the message is within the last second
+            global dBirthTime, dDeathTime, device_online
+            if tokens[2] == "DBIRTH":
+#                 print("Device Birth Certificate has been received")
+                dBirthTime = inboundPayload.timestamp
+                
+            elif tokens[2] == "DDEATH":
+#                 print("Device Death Certificate has been received")
+                dDeathTime = inboundPayload.timestamp
 
-                elif tokens[2] == "DDEATH":
-                    print("Device Death Certificate has been received")
-                    dDeathTime = inboundPayload.timestamp
+            if all(var in globals().keys() for var in ['dBirthTime', 'dDeathTime']): # if both birth and death certificates have been received
+                if dDeathTime > dBirthTime: # if the death certificate is after the birth certificate
                     device_online = False
-
-                if all(var in globals().keys() for var in ['dBirthTime', 'dDeathTime']): # if both birth and death certificates have been received
-                    if dDeathTime > dBirthTime: # if the death certificate is after the birth certificate
-                        device_online = False
-                    else:
-                        device_online = True
+                else:
+                    device_online = True
     else:
         print("Unknown command...")
 
@@ -200,7 +197,7 @@ deathByteArray = deathPayload.SerializeToString()
 # Start of main program - Set up the MQTT client connection
 qos = 2
 ret = True
-client = mqtt.Client(myNodeName, clean_session=False)
+client = mqtt.Client(myNodeName, clean_session=True)
 client.on_connect = on_connect
 client.on_message = on_message
 client.username_pw_set(myUsername, myPassword)
