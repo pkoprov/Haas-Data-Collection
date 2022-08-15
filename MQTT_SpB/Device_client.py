@@ -1,4 +1,5 @@
 import sys
+import os
 
 sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
@@ -18,9 +19,10 @@ from powerMeter import PowerMeter
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#", qos)
-        print("Connected with result code " + str(rc))
+        client.subscribe("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, qos)
+        print("Device connected with result code " + str(rc))
     else:
-        print("Failed to connect with result code " + str(rc) + "\n")
+        print("Device Failed to connect with result code " + str(rc) + "\n")
         sys.exit()
 
 
