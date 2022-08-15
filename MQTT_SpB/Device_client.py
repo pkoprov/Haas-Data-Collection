@@ -30,7 +30,7 @@ def on_connect(client, userdata, flags, rc):
 # The callback for when a PUBLISH message is received from the server.
 ######################################################################
 def on_message(client, userdata, msg):
-    print("Device message arrived: " + msg.topic)
+#     print("Device message arrived: " + msg.topic)
     tokens = msg.topic.split("/")
 
     # if the message is purposed for this device and is a command
@@ -54,6 +54,12 @@ def on_message(client, userdata, msg):
                 pass
             else:
                 print("Unknown command: " + metric.name)
+    elif tokens[0] == "spBv1.0" and tokens[1] == myGroupId and tokens[2] == "DDEATH" and tokens[4] == myDeviceName:
+        global newdeath
+        if newdeath:
+            print("Device Death Certificate has been published")
+            os._exit(1)
+            print("Bye!")
     else:
         print("Unknown command...")
 
@@ -170,7 +176,8 @@ def publishDeviceData():
         print("Could not get data from CNC machine")
         tn.close()
         publishDeviceDeath()
-        sys.exit()
+        return
+
 
     # iterate through new metrics values to find if there was a change
     for i, metric in enumerate(payload.metrics):  
@@ -219,10 +226,9 @@ def publishDeviceDeath():
     addMetric(deathPayload, "Device Control/Reboot", None, MetricDataType.Boolean, True)
     totalByteArray = deathPayload.SerializeToString()
     client.publish("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2, True)
-    print("Device Death Certificate has been published")
-    time.sleep(0.1)
-    tn.close()
-    sys.exit()
+    global newdeath
+    newdeath = True
+    time.sleep(10)
 
 
 def addPowerData(payload):
@@ -269,6 +275,7 @@ if powerMeter:
             ammeter = None
 
 time.sleep(1)
+newdeath = False
 
 qos = 2
 ret = True
