@@ -11,12 +11,13 @@ from sparkplug_b import *
 with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\historian.config",
           'r') as config:  # uncomment for Windows
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
+    hostname = config.readline().split(" = ")[1].replace("\n", "")
     myGroupId = config.readline().split(" = ")[1].replace("\n", "")
     dbName = config.readline().split(" = ")[1].replace("\n", "")
     myUsername = config.readline().split(" = ")[1].replace("\n", "")
     myPassword = config.readline().split(" = ")[1].replace("\n", "")
 
-conn = pg.connect(f"dbname={dbName} user={myUsername} password={myPassword}")  # connect to DB
+conn = pg.connect(f"dbname={dbName} user={myUsername} password={myPassword} host={hostname}")  # connect to DB
 
 try:
     cur = conn.cursor()  # create a cursor object
@@ -73,6 +74,7 @@ def on_message(client, userdata, msg):
         elif tokens[2] == "DDATA":
             # insert data into DB
             append_table(tokens[4], inboundPayload)
+            print('Device data published to DB')
         elif tokens[2] == "NCMD":
             print('Action has not been implemented yet')
         elif tokens[2] == "DCMD":
