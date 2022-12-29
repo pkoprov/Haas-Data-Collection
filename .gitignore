@@ -4,3 +4,4 @@ test.*
 *.dwg
 *.log
 *.pyc
+test*
