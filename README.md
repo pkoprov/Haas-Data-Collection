@@ -32,8 +32,9 @@ Arduino
 ├── **[DB Table columns.csv](DB%20Table%20columns.csv)** &emsp; &emsp; # file with macros to be used ind Device client  
 ├── **[DB Table columns.xlsx](DB%20Table%20columns.xlsx)** &emsp;&emsp; # spreadsheet with macros  
 ├── *historian.config*&emsp; &emsp; &emsp;&emsp;&emsp; &emsp;# config file to be used for Historian.py   
+├── *historian.service*&emsp; &emsp; &emsp;&emsp;&emsp; &emsp;# daemon to run on boot in Linux systems   
 ├── *Node.config* &emsp; &emsp; &emsp; &emsp; &emsp; &emsp; # config file to be used for Node_client.py  
-├── *node_client.service*&emsp;&emsp; &emsp; &emsp; # daemon to tun on RPI boot  
+├── *node_client.service*&emsp;&emsp; &emsp; &emsp; # daemon to run on RPI boot  
 ├── *Q-codes.py*&emsp;&emsp;&emsp; &emsp; &emsp; &emsp;&emsp; # helper function to create csv file with Q-codes  
 ├── *Q-codes.xlsx*&emsp;&emsp;&emsp;&emsp;&emsp;&emsp; &emsp; # spreadsheet that is created after running the Q-codes.py  
 ├── *README.md*&emsp;&emsp;&emsp;&emsp;&emsp;&emsp; &emsp;# this file  
@@ -48,7 +49,7 @@ on boot the daemon file needs to be created. The file **node_client.service** mu
 /lib/systemd/system/. This can be performed by running the following in the command line:
 
 ```
-sudo cp publisher.service /lib/systemd/system/publisher.service
+sudo cp node_client.service /lib/systemd/system/node_client.service
 ```
 
 After the file was copied to the root folder it needs to be enabled by the following commands:
@@ -70,7 +71,6 @@ To check the status of the daemon run the following line:
 sudo systemctl status node_client.service
 ```
 
-The **publisher.service** is included in GitHub repo.
 
 ### [Node.config](Node.config)
 
@@ -112,6 +112,35 @@ information should be kept in the _historian.config_ file.
 ### [historian.config](historian.config)
 
 This file is the input parameters for the **Historian.py** script.
+
+### [historian.service](historian.service)
+
+This file is the daemon service to be run on Linux systems to record data to DB. 
+
+The file **historian.service** must be copied to the folder /lib/systemd/system/. This can be performed by running the following in the command line:
+
+```
+sudo cp historian.service /lib/systemd/system/historian.service
+```
+
+After the file was copied to the root folder it needs to be enabled by the following commands:
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable historian.service
+```
+
+The daemon will start working right after reboot. If you want to start the daemon immediately run following line:
+
+```
+sudo systemctl start historian.service
+```
+
+To check the status of the daemon run the following line:
+
+```
+sudo systemctl status historian.service
+```
 
 ## The recommended software
 
