@@ -2,11 +2,11 @@
 Description=Historian to write data to PostgresSQL database
 
 [Service]
-ExecStart=/usr/bin/python3 -u Historian.py
-WorkingDirectory=/home/pi/Haas-Data-Collection/MQTT_SpB
+ExecStart=/usr/bin/python3 -u MQTT_SpB/Historian.py
+WorkingDirectory=/home/pkoprov/Haas-Data-Collection/
 Restart=always
 RestartSec=10s
-User=pi
+User=pkoprov
 
 [Install]
 WantedBy=multi-user.target

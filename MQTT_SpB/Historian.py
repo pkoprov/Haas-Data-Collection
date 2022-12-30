@@ -4,11 +4,11 @@ import paho.mqtt.client as mqtt
 import pandas as pd
 import psycopg2 as pg
 
-sys.path.insert(0, r'C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb')  # uncomment for Windows
+sys.path.insert(0, './spb')  # uncomment for Windows
 
 from sparkplug_b import *
 
-with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\historian.config",
+with open("./historian.config",
           'r') as config:  # uncomment for Windows
     mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
     hostname = config.readline().split(" = ")[1].replace("\n", "")
