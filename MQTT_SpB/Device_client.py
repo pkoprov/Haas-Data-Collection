@@ -279,7 +279,7 @@ newdeath = False
 
 qos = 2
 ret = True
-client = mqtt.Client(myDeviceName, clean_session=True)
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, myDeviceName, clean_session=True)
 client.on_connect = on_connect
 client.on_message = on_message
 client.username_pw_set(myUsername, myPassword)
