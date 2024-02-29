@@ -2,4 +2,4 @@ openpyxl
 pandas
 psycopg2
 paho-mqtt
-protobuf
+protobuf==3.20
