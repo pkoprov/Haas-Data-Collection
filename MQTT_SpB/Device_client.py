@@ -1,5 +1,8 @@
 import sys
 import os
+import logging
+import csv
+import threading
 
 sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
@@ -7,314 +10,402 @@ import sparkplug_b as sparkplug
 from sparkplug_b import *
 import time
 import telnetlib
-from serial.tools.list_ports import comports
-import paho.mqtt.client as mqtt
-# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\MQTT_SpB") # uncomment for Windows
-from powerMeter import PowerMeter
+from Node_client import read_config, setup_mqtt_client
 
 
-######################################################################
-# The callback for when the client receives a CONNACK response from the server.
-######################################################################
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#", qos)
-        client.subscribe("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, qos)
-        print("Device connected with result code " + str(rc))
-    else:
-        print("Device Failed to connect with result code " + str(rc) + "\n")
-        sys.exit()
+class Device:
+    def __init__(
+        self, config_path="./Node.config", parameter_csv="./DB Table columns.csv"
+    ):
+        logging.basicConfig(
+            level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+        )
+        self.config = read_config(config_path)
+        # Use the function to read parameters from the CSV file
+        self.par_list = self.parse_csv_parameters(parameter_csv)
 
+        self.MAC_LIST = b"?E1064 -1\n?E1065 -1\n?E1066 -1\n"
 
-######################################################################
-# The callback for when a PUBLISH message is received from the server.
-######################################################################
-def on_message(client, userdata, msg):
-#     print("Device message arrived: " + msg.topic)
-    tokens = msg.topic.split("/")
+        self.client = setup_mqtt_client(self.config)
 
-    # if the message is purposed for this device and is a command
-    if tokens[0] == "spBv1.0" and tokens[1] == myGroupId and tokens[2] == "DCMD" and tokens[3] == myNodeName:
-        inboundPayload = sparkplug_b_pb2.Payload()  # create a new payload object
-        inboundPayload.ParseFromString(msg.payload)  # parse the payload into the payload object
-        for metric in inboundPayload.metrics:  # iterate through the metrics in the payload
+        self.client.on_message = self.on_message
+        self.client.on_connect = self.on_connect
+        self.birth_published = threading.Event()
+
+    def connect(self, broker=None, port=1883, keepalive=60):
+        if not broker:
+            broker = self.config["broker"]
+        self.client.connect(broker, port, keepalive)
+        self.client.loop_start()
+
+    def disconnect(self):
+        self.client.loop_stop()
+        self.client.disconnect()
+        logging.info("Device disconnected")
+
+    def on_connect(self, client, ud, flags, rc):
+        if rc == 0:
+            logging.info("Device connected with result code %s", rc)
+            client.subscribe(
+                f"{ud['spBv']}/{ud['myGroupId']}/DCMD/{ud['myNodeName']}/#", ud["QoS"]
+            )
+            client.subscribe(
+                f"{ud['spBv']}/{ud['myGroupId']}/DDEATH/{ud['myNodeName']}/{ud['myDeviceName']}",
+                ud["QoS"],
+            )
+            time.sleep(0.2)
+            self.publishDeviceBirth()
+            self.birth_published.set()
+        else:
+            logging.error("Device Failed to connect with result code %s", rc)
+
+    def on_message(self, client, ud, msg):
+        logging.info("Device message arrived: %s", msg.topic)
+        tokens = msg.topic.split("/")
+
+        # Check if the message is intended for this device
+        if (
+            tokens[0] == ud["spBv"]
+            and tokens[1] == ud["myGroupId"]
+            and tokens[2] in ["DCMD", "DDEATH"]
+        ):
+            self.handle_message(tokens, msg, ud)
+        else:
+            logging.warning("Unknown command received: %s", msg.topic)
+
+    def handle_message(self, tokens, msg, ud):
+        if tokens[2] == "DCMD" and tokens[3] == ud["myNodeName"]:
+            self.handle_command_message(msg, ud)
+        elif tokens[2] == "DDEATH" and tokens[4] == ud["myDeviceName"]:
+            self.handle_death_message(ud)
+        else:
+            logging.warning("Unhandled message type: %s", "/".join(tokens))
+
+    def handle_command_message(self, msg, ud):
+        inboundPayload = sparkplug_b_pb2.Payload()
+
+        try:
+            # Attempt to parse the inbound message payload
+            inboundPayload.ParseFromString(msg.payload)
+        except Exception as e:
+            # Log the exception and return early if parsing fails
+            logging.error("Failed to parse inbound payload: %s", e)
+            return
+
+        for metric in inboundPayload.metrics:
             if metric.name == "Device Control/Rebirth" and metric.boolean_value:
-                publishDeviceBirth()
-                print("Device has been reborn")
+                ud["publishDeviceBirth"]()
+                logging.info("Device has been reborn")
             elif metric.name == "Device Control/Reconnect":
-                print("Node is going to reboot")
-                global tn
-                tn = tn.close()
+                logging.info("Node is going to reboot")
                 try:
-                    tn = open(CNC_host, 5051, 3)
-                except:
-                    print("Device reconnect failed")
-                    sys.exit()
+                    ud["tn"].close()
+                    ud["tn"] = open(ud["CNC_host"], 5051, 3)
+                except Exception as e:
+                    logging.error("Device reconnect failed: %s", e)
+                    ud["tn"] = False
             elif metric.name == "bdSeq":
                 pass
             else:
-                print("Unknown command: " + metric.name)
-    elif tokens[0] == "spBv1.0" and tokens[1] == myGroupId and tokens[2] == "DDEATH" and tokens[4] == myDeviceName:
-        global newdeath
-        if newdeath:
-            print("Device Death Certificate has been published")
-            os._exit(1)
-            print("Bye!")
-    else:
-        print("Unknown command...")
+                logging.warning("Unknown command: %s", metric.name)
 
+    def handle_death_message(self, ud):
+        logging.info("Device Death Certificate has been published. Oh well...")
+        # self.disconnect()
+        # if ud["newdeath"]:
+        #     logging.info("Device Death Certificate has been published. Exiting...")
+        #     sys.exit()
 
-# function to get data from NGC
-def getDdata():
-    payload = sparkplug.getDdataPayload()
+    # function to get data from NGC
+    def getDdata(self):
+        payload = sparkplug.getDdataPayload()
 
-    code = "".join([par[-1] + "\n" for par in par_list]).encode() + b"|*|\n"
-    try:
-        tn.read_very_eager()  # clear buffer
-        tn.write(code)  # send command
-    except:
-        # if connection fails, try to reconnect
-        print(f"Telnet connection failed! Could not write codes to CNC machine")
-        raise ConnectionError
-    try:
-        msg = tn.read_until(b'|*|', 1)  # read response
-    except:
-        # if connection fails, try to reconnect
-        print(f"Telnet connection failed! Could not read from CNC machine")
-        raise ConnectionError
-    if b"|*|" in msg:
-        msg = msg[:-10]
-    else:
-        print(f"Telnet connection failed! Could not read all message from CNC machine")
-        raise ConnectionError
-    try:
-        val_list = parse(msg, par_list)  # parse response
-    except ValueError:
-        print(f"{n} Empty value for {par[0]}")
-        raise ConnectionError
+        # Convert command list to byte string
+        code = b"".join([f"{par[-1]}\n".encode() for par in self.par_list]) + b"|*|\n"
+        # Clear buffer and send command
+        try:
+            self.tn.read_very_eager()
+            self.tn.write(code)
+        except Exception as e:
+            logging.error(
+                f"Telnet connection failed! Could not write codes to CNC machine: {e}"
+            )
+            raise ConnectionError("Failed to write to CNC machine.")
 
-    # Add device metrics
-    for n, par in enumerate(par_list):  # iterate through the parameters
-        if par[1] == 3:  # int
-            val_list[n] = int(float(val_list[n]))
-        elif par[1] == 9:  # float
-            val_list[n] = float(val_list[n])
-        elif par[1] == 11:  # boolean
-            val_list[n] = bool(float(val_list[n]))
-        elif par[1] == 12:  # string
-            val_list[n] = str(val_list[n])
-        if "Max axis load" in par[0] and val_list[n] == -1:
-            continue
-        addMetric(payload, par[0], None, par[1], val_list[n])
+        # Read response
+        try:
+            msg = self.tn.read_until(b"|*|", timeout=1)
+            if not msg.endswith(b"|*|"):
+                raise ConnectionError("Incomplete message received from CNC machine.")
+        except Exception as e:
+            logging.error(
+                f"Telnet connection failed! Could not read from CNC machine: {e}"
+            )
+            raise ConnectionError("Failed to read from CNC machine.")
 
-    # send macros to NGC
-    try:
-        tn.write(mac_list)
-    except:
-        print(f"Telnet connection failed! Could not write {mac} to CNC machine")
-        raise ConnectionError
+        # Parse the message
+        try:
+            val_list = self.parse(msg)
+        except ValueError as e:
+            logging.error(f"Error parsing message: {e}")
+            raise
 
-    tn.read_until(b'>>!\r\n' * len(mac_list.split(b"\n")[:-1]), timeout=1)  # flush the buffer after macros
-    return payload
-
-
-# function to parse output of CNC machine from telnet port
-def parse(telnetdata, par_list):
-    val_list = []
-    msg_lst = telnetdata.decode().replace(">", "").split("\r\n")
-
-    for msg, par in zip(msg_lst, par_list):
-        msg = msg.split(", ")
-
-        if len(msg) == 2 and msg[1] != "?":  # if value exists
-            if 'year' in par[0].lower():
-                val = time.strftime("%Y/%m/%d", time.strptime(msg[1][:-2], "%y%m%d"))
-            elif 'hour' in par[0].lower():
-                val = time.strftime("%H:%M:%S", time.strptime(msg[1][:-2], "%H%M%S"))
-            elif 'rpm' in par[0].lower():
-                val = int(float(msg[1]))
-            else:
-                val = msg[1]
-        elif ('program' and "parts") in ''.join(msg).lower():
-            val = ', '.join(msg)
-        elif 'busy' in ''.join(msg).lower():
-            val = "BUSY"
-        else:
-            raise ValueError("No value found for parameter: " + par[0])
-        val_list.append(val)
-    return val_list
-
-
-# function to publish device birth certificate
-def publishDeviceBirth():
-    global previous_Ddata
-    print("Publishing Device Birth Certificate")
-    try:
-        payload = getDdata()  # get data from NGC
-    except:
-        print("Could not get data from CNC machine")
-        tn.close()
-        sys.exit()
-
-    addPowerData(payload) if powerMeter else False
-
-    totalByteArray = payload.SerializeToString()
-    # Publish the initial data with the Device BIRTH certificate
-    client.publish("spBv1.0/" + myGroupId + "/DBIRTH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2,
-                   True)
-    time.sleep(0.1)
-    print("Device Birth Certificate has been published")
-    previous_Ddata = payload
-
-
-# function to publish device data
-def publishDeviceData():
-    global previous_Ddata
-    try:
-        payload = getDdata()
-    except:
-        print("Could not get data from CNC machine")
-        tn.close()
-        publishDeviceDeath()
-        return
-
-
-    # iterate through new metrics values to find if there was a change
-    for i, metric in enumerate(payload.metrics):  
-        if metric.name in ['Year, month, day', 'Hour, minute, second', 'Power-on Time (total)',
-                           'Power on timer (read only)']:  # ignore these metrics
-            continue
-        else:  # find previous metric matching current metric
+        # Process and add metrics
+        for n, par in enumerate(self.par_list):
+            value = val_list[n]
             try:
-                previous_metric = [prev_met for prev_met in previous_Ddata.metrics if prev_met.name == metric.name][0]
-            except:
-                print(f"\nDevice metric has been added:\n{metric}")
-                stale = False
-                break
-            if metric.name == "Coolant level" and abs(
-                    metric.float_value - previous_metric.float_value) < 2:  # if coolant level is stable
-                stale = True
+                if par[1] == 3:  # int
+                    value = int(float(value))
+                elif par[1] == 9:  # float
+                    value = float(value)
+                elif par[1] == 11:  # boolean
+                    value = bool(float(value))
+                elif par[1] == 12:  # string
+                    value = str(value)
+            except ValueError as e:
+                logging.warning(f"Conversion error for {par[0]}: {e}")
                 continue
-            elif (
-                    previous_metric.datatype == MetricDataType.String and metric.string_value == previous_metric.string_value) or (
-                    previous_metric.datatype == MetricDataType.Float and metric.float_value == previous_metric.float_value) or (
-                    previous_metric.datatype == MetricDataType.Int32 and metric.int_value == previous_metric.int_value) or (
-                    previous_metric.datatype == MetricDataType.Boolean and metric.boolean_value == previous_metric.boolean_value):
-                stale = True
-                continue
-            else:
-                print(f"\nDevice metric has changed:\n{metric}")
-                stale = False
-                break
-    if stale:
-        return
 
-    else:
-        addPowerData(payload) if powerMeter else False
+            if "Max axis load" in par[0] and value == -1:
+                continue
+            addMetric(payload, par[0], None, par[1], value)
+
+        # Send macros to NGC
+        try:
+            self.tn.write(self.MAC_LIST)
+            self.tn.read_until(
+                b">>!\r\n" * len(self.MAC_LIST.split(b"\n")[:-1]), timeout=1
+            )
+        except Exception as e:
+            logging.error(
+                f"Telnet connection failed! Could not write {self.MAC_LIST} to CNC machine: {e}"
+            )
+            raise ConnectionError("Failed to write macros to CNC machine.")
+
+        return payload
+
+    # function to parse output of CNC machine from telnet port
+    def parse(self, telnet_data):
+        val_list = []
+        # Decode and split the telnet data into lines
+        msg_list = telnet_data.decode().replace(">", "").split("\r\n")
+
+        for msg, par in zip(msg_list, self.par_list):
+            # Split the message by comma and space
+            msg_parts = msg.split(", ")
+
+            # Check if the message is valid and has an expected value
+            if len(msg_parts) == 2 and msg_parts[1] != "?":
+                key, raw_val = msg_parts
+                try:
+                    # Apply specific parsing rules based on the parameter type
+                    if "year" in par[0].lower():
+                        val = time.strftime(
+                            "%Y/%m/%d", time.strptime(raw_val[:-2], "%y%m%d")
+                        )
+                    elif "hour" in par[0].lower():
+                        val = time.strftime(
+                            "%H:%M:%S", time.strptime(raw_val[:-2], "%H%M%S")
+                        )
+                    elif "rpm" in par[0].lower():
+                        val = int(float(raw_val))
+                    else:
+                        val = raw_val
+                except ValueError as e:
+                    logging.error(f"Error parsing {par[0]} with value {raw_val}: {e}")
+                    continue  # Skip this value on error
+            elif "program" in msg.lower() and "parts" in msg.lower():
+                val = ", ".join(msg_parts)
+            elif "busy" in msg.lower():
+                val = "BUSY"
+            else:
+                logging.warning(f"No value found for parameter: {par[0]}")
+                continue  # Skip this parameter if no valid value is found
+
+            val_list.append(val)
+
+        return val_list
+
+    # function to publish device birth certificate
+    def publishDeviceBirth(self):
+        logging.info("Publishing Device Birth Certificate")
+        self.config["stale_notice"] = True
+
+        try:
+            payload = self.getDdata()
+        except Exception as e:
+            logging.error(f"Could not get data from CNC machine: {e}")
+            self.tn.close()
+            self.tn = False
+            self.disconnect()
+            return
 
         totalByteArray = payload.SerializeToString()
-        # Publish the initial data with the Device BIRTH certificate
-        client.publish("spBv1.0/" + myGroupId + "/DDATA/" + myNodeName + "/" + myDeviceName, totalByteArray, 2, True)
+        topic = f"{self.config['spBv']}/{self.config['myGroupId']}/DBIRTH/{self.config['myNodeName']}/{self.config['myDeviceName']}"
+        # Publish the device birth certificate with QoS as per config and retain flag True
+        self.client.publish(
+            topic, totalByteArray, qos=int(self.config["QoS"]), retain=True
+        )
+        time.sleep(0.1)  # Small delay to ensure message is published before proceeding
+        logging.info("Device Birth Certificate has been published")
+        self.config["stale"] = True
+        # Example of storing data for later comparison or usage, if needed
+        self.config["previous_Ddata"] = payload
+        # return payload
 
-        print("^Device Data has been published")
-        previous_Ddata = payload  # update previous data
+    # function to publish device data
+    def publishDeviceData(self):
+        self.birth_published.wait()
 
+        (
+            logging.info("Attempting to publish device data...")
+            if self.config["stale_notice"]
+            else 0
+        )
 
-def publishDeviceDeath():
-    deathPayload = sparkplug.getDdataPayload()
-    print("Publishing Device Death Certificate")
-    addMetric(deathPayload, "Device Control/Reboot", None, MetricDataType.Boolean, True)
-    totalByteArray = deathPayload.SerializeToString()
-    client.publish("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/" + myDeviceName, totalByteArray, 2, True)
-    global newdeath
-    newdeath = True
-    time.sleep(10)
+        try:
+            payload = self.getDdata()
+        except Exception as e:
+            logging.error("Could not get data from CNC machine: %s", e)
+            self.tn.close()
+            self.tn = False
+            self.publishDeviceDeath()
+            self.disconnect()
+            return
 
-
-def addPowerData(payload):
-    if ammeter.ready() > 0:
-        currentIrms = ammeter.Irms()
-        [addMetric(payload, "Electric current/Phase_%s" % (n + 1), None, MetricDataType.Float, i)
-        for n, i in enumerate(currentIrms) if len(currentIrms) == 3]
-    elif powerMeter:
-        print("Check power meter!!!")
-    
-    
-# read data specific to setup and machines
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/Node.config") as config:  # uncomment for Raspberry Pi
-    mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
-    myGroupId = config.readline().split(" = ")[1].replace("\n", "")
-    myNodeName = config.readline().split(" = ")[1].replace("\n", "")
-    myDeviceName = config.readline().split(" = ")[1].replace("\n", "")
-    CNC_host = config.readline().split(" = ")[1].replace("\n", "")
-    myUsername = config.readline().split(" = ")[1].replace("\n", "")
-    myPassword = config.readline().split(" = ")[1].replace("\n", "")
-    powerMeter = config.readline().split(" = ")[1].replace("\n", "")
-
-powerMeter = True if powerMeter.lower() in ("true", 'yes', 'attached', '1') else False
-
-try:
-    tn = telnetlib.Telnet(CNC_host, 5051, 3)
-except:
-    print("Cannot connect to CNC machine")
-    sys.exit()
-
-if powerMeter:
-    for port in comports():
-        if "CP210" in port[1]:
-            try:
-                ammeter = PowerMeter(port[0])
-                print('Connected to USB device "%s..."' % port[1][:50])
+        for metric in payload.metrics:
+            if metric.name in [
+                "Year, month, day",
+                "Hour, minute, second",
+                "Power-on Time (total)",
+                "Power on timer (read only)",
+            ]:
+                continue
+            previous_metric = next(
+                (
+                    m
+                    for m in self.config["previous_Ddata"].metrics
+                    if m.name == metric.name
+                ),
+                None,
+            )
+            if previous_metric is None:
+                logging.info(f"\nDevice metric has been added:\n{metric}")
+                self.config["stale"] = False
                 break
-            except:
-                powerMeter = False
-                print("Check power meter!!!")
+            if not self.has_metric_changed(previous_metric, metric):
+                self.config["stale"] = True
+                continue  # No significant change, continue checking
+            else:
+                logging.info(f"\nDevice metric has changed:\n{metric}")
+                self.config["stale"] = False
+                break
+
+        if self.config["stale"]:
+            (
+                logging.info("No changes in device data. Skipping publication.")
+                if self.config["stale_notice"]
+                else 0
+            )
+            self.config["stale_notice"] = False
+            return
+
+        totalByteArray = payload.SerializeToString()
+        topic = f"{self.config['spBv']}/{self.config['myGroupId']}/DDATA/{self.config['myNodeName']}/{self.config['myDeviceName']}"
+        self.client.publish(
+            topic, totalByteArray, qos=int(self.config["QoS"]), retain=True
+        )
+
+        logging.info("Device data has been published.")
+        self.config["previous_Ddata"] = payload
+        self.config["stale_notice"] = True
+        # return payload  # Return the current payload for external tracking
+
+    def has_metric_changed(self, previous_metric, current_metric):
+
+        # Special case for "Coolant level" with a threshold for change
+        if current_metric.name == "Coolant level":
+            if abs(current_metric.float_value - previous_metric.float_value) < 2:
+                return False  # Change is within the threshold, not significant
+
+        # Check for changes based on data type
+        if previous_metric.datatype == current_metric.datatype:
+            if previous_metric.datatype == MetricDataType.String:
+                return current_metric.string_value != previous_metric.string_value
+            elif previous_metric.datatype == MetricDataType.Float:
+                return current_metric.float_value != previous_metric.float_value
+            elif previous_metric.datatype == MetricDataType.Int32:
+                return current_metric.int_value != previous_metric.int_value
+            elif previous_metric.datatype == MetricDataType.Boolean:
+                return current_metric.boolean_value != previous_metric.boolean_value
         else:
-            print("Could not connect to USB port")
-            ammeter = None
+            # If datatype itself has changed, consider it a significant change
+            return True
 
-time.sleep(1)
-newdeath = False
+        # If none of the above conditions met, assume no significant change
+        return False
 
-qos = 2
-ret = True
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, myDeviceName, clean_session=True)
-client.on_connect = on_connect
-client.on_message = on_message
-client.username_pw_set(myUsername, myPassword)
+    def publishDeviceDeath(self):
+        self.birth_published.wait()
+        logging.info("Publishing Device Death Certificate")
 
-client.connect(mqttBroker, 1883, 60)
-client.loop_start()
-time.sleep(0.1)
+        deathPayload = sparkplug.getDdataPayload()
 
-# read required parameters from csv file
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\DB Table columns.csv") as text:  # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/DB Table columns.csv") as text:  # uncomment for Raspberry Pi
-    parameters = text.read().split('\n')[:-1]
+        # Add "Device Control/Reboot" metric to the deathPayload
+        addMetric(
+            deathPayload, "Device Control/Reboot", None, MetricDataType.Boolean, True
+        )
 
-# create parameter tuples
-par_list = []
-for i, par in enumerate(parameters):
-    par = par.split(',')
-    code = par[0]
-    name = ''.join(par[1:-1]).replace(';', ',')
-    if par[-1] == 'boolean':
-        data_type = MetricDataType.Boolean
-    elif par[-1] == 'str':
-        data_type = MetricDataType.String
-    elif par[-1] == 'float':
-        data_type = MetricDataType.Float
-    elif par[-1] == 'int':
-        data_type = MetricDataType.Int32
-    par_list.append((name, data_type, code))
-par_list = tuple(par_list)
+        totalByteArray = deathPayload.SerializeToString()
+        topic = f"{self.config['spBv']}/{self.config['myGroupId']}/DDEATH/{self.config['myNodeName']}/{self.config['myDeviceName']}"
 
-mac_list = b"?E1064 -1\n?E1065 -1\n?E1066 -1\n"
+        # Publish the device death certificate with QoS 2 and retain flag True
+        self.client.publish(
+            topic, totalByteArray, qos=int(self.config["QoS"]), retain=True
+        )
+        logging.info("Device Death Certificate has been published")
 
-publishDeviceBirth()  # publish birth certificate
+        self.config["newdeath"] = True
+        time.sleep(10)
 
-while True:
-    publishDeviceData()  # publish data if data has changed
-    time.sleep(0.1)
-    
+    def setup_telnet_connection(self):
+        """Attempt to establish the Telnet connection based on provided configuration."""
+        try:
+            self.tn = telnetlib.Telnet(self.config["CNC_host"], 5051, 3)
+            logging.info("Connected to CNC machine via Telnet.")
+            return self.tn
+        except Exception as e:
+            logging.error("Cannot connect to CNC machine: %s", e)
+            self.tn = False
+
+    # Function to parse the CSV file and return a list of parameter tuples
+    def parse_csv_parameters(self, file_path):
+        par_list = []
+        with open(file_path, "r", newline="") as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                code = row[0]
+                name = "".join(row[1:-1]).replace(";", ",")
+                data_type_str = row[-1]
+                data_type = {
+                    "boolean": MetricDataType.Boolean,
+                    "str": MetricDataType.String,
+                    "float": MetricDataType.Float,
+                    "int": MetricDataType.Int32,
+                }.get(
+                    data_type_str, MetricDataType.String
+                )  # Default to String if unknown
+                par_list.append((name, data_type, code))
+        return tuple(par_list)
+
+
+if __name__ == "__main__":
+    path = os.path.dirname(__file__)
+    vf2 = Device(f"{path}/../Node.config", f"{path}/../DB Table columns.csv")
+    vf2.setup_telnet_connection()
+    vf2.connect()
+    time.sleep(0.2)
+
+    while vf2.tn:
+        vf2.publishDeviceData()
+        time.sleep(0.1)

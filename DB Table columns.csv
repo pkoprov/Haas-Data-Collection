@@ -1,28 +1,8 @@
-?Q100,Machine Serial Number,str
-?Q101,Control Software Version,str
-?Q102,Machine Model Number,str
 ?Q600 3011,Year; month; day,str
 ?Q600 3012,Hour; minute; second,str
 ?Q104,Mode (LIST PROG; MDI; etc.),str
-?Q200,Tool Changes (total),int
 ?Q201,Tool Number in use,int
-?Q300,Power-on Time (total),str
-?Q301,Motion Time (total),str
-?Q303,Last Cycle Time,str
-?Q304,Previous Cycle Time,str
 ?Q500,Three-in-one (PROGRAM; Oxxxxx; STATUS; PARTS; xxxxx),str
-?Q600 1064,Max axis load for X,float
-?Q600 1065,Max axis load for Y,float
-?Q600 1066,Max axis load for Z,float
-?Q600 1098,Spindle load with Haas vector drive (read only),float
-?Q600 3020,Power on timer (read only),int
-?Q600 3021,Cycle start timer, int
-?Q600 3022,Feed timer,int
-?Q600 3023,Present part timer (read only),int
-?Q600 3024,Last complete part timer (read only),int
-?Q600 3025,Previous part timer (read only),int
-?Q600 3027,Spindle RPM (read only),int
 ?Q600 5021,Present machine coordinate position X,float
 ?Q600 5022,Present machine coordinate position Y,float
 ?Q600 5023,Present machine coordinate position Z,float
-?Q600 13013,Coolant level,int

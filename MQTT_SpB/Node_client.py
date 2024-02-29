@@ -1,37 +1,60 @@
 import os
 import sys
-import threading
+import logging
 import time
-
+import platform
+import subprocess
 import paho.mqtt.client as mqtt
 
-# sys.path.insert(0, r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\spb") # uncomment for Windows
 sys.path.insert(0, "/home/pi/Haas-Data-Collection/spb")  # uncomment for Raspberry Pi
 
 import sparkplug_b as sparkplug
 from sparkplug_b import *
 
+# Improved error handling and logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 ######################################################################
 # function to ping the NGC
 ######################################################################
-def device_ping(device_ip, timeout=1):
-    global device_online
-    ping = True
-    while True:
-        if not device_online:
-            if os.system("ping -c 1 " + device_ip + ' | grep "1 received"') == 0:  # uncomment for Raspberry Pi
-                ping = True
-                #         if os.system("ping -c 1 " + device_ip + ' | find "Received = 1"') == 0: # uncomment for Windows
-                print("Starting of the Device program")
-                os.system("python3 ./Device_client.py")  # uncomment for Raspberry Pi
-                # os.system("python Device_client.py") # uncomment for Windows
-            elif ping:
-                print("NGC is not reachable")
-                ping = False
-            else:
-                pass
-        time.sleep(timeout)
+def device_ping(config, timeout=1):
+    import platform
+    import subprocess
+
+    ping_cmd = (
+        "ping -c 1 " + config["CNC IP"]
+        if platform.system() != "Windows"
+        else "ping -n 1 " + config["CNC IP"]
+    )
+    success_indicator = (
+        "1 received" if platform.system() != "Windows" else "Received = 1"
+    )
+    try:
+        # Perform the ping check
+        response = subprocess.run(
+            ping_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+            text=True,
+        )
+        if success_indicator in response.stdout:
+            if not config["device_online"] and start_device_program:
+                logging.info("Starting the Device program")
+                subprocess.run(start_device_program, shell=True)
+            config["device_online"] = True
+        else:
+            logging.info("NGC is not reachable")
+            config["device_online"] = False
+    except Exception as e:
+        logging.error(f"Failed to ping {config['CNC IP']}: {e}")
+        config["device_online"] = False
+
+    time.sleep(timeout)
+    return config["device_online"]
 
 
 ######################################################################
@@ -39,13 +62,15 @@ def device_ping(device_ip, timeout=1):
 ######################################################################
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        client.subscribe("spBv1.0/" + myGroupId + "/NCMD/" + myNodeName + "/#", qos)
-        client.subscribe("spBv1.0/" + myGroupId + "/DCMD/" + myNodeName + "/#", qos)
-        client.subscribe("spBv1.0/" + myGroupId + "/DDEATH/" + myNodeName + "/#", qos)
-        client.subscribe("spBv1.0/" + myGroupId + "/DBIRTH/" + myNodeName + "/#", qos)
-        print("Node connected with result code " + str(rc))
+        logging.info("Node connected with result code %s", rc)
+        topics = ["NCMD", "DCMD", "DDEATH", "DBIRTH"]
+        for topic in topics:
+            client.subscribe(
+                f"{userdata['spBv']}/{userdata['myGroupId']}/{topic}/{userdata['myNodeName']}/#",
+                userdata["QoS"],
+            )
     else:
-        print("Node failed to connect with result code " + str(rc))
+        logging.error("Node Failed to connect with result code %s", rc)
         sys.exit()
 
 
@@ -53,171 +78,320 @@ def on_connect(client, userdata, flags, rc):
 # The callback for when a PUBLISH message is received from the server.
 ######################################################################
 def on_message(client, userdata, msg):
-    global inboundPayload
-    print("Message arrived: " + msg.topic)
+    logging.info("Node message arrived: %s", msg.topic)
     tokens = msg.topic.split("/")
 
-    # if the message is purposed for this node
-    if tokens[0] == "spBv1.0" and tokens[1] == myGroupId and tokens[3] == myNodeName:
-        inboundPayload = sparkplug_b_pb2.Payload()  # create a payload object
-        inboundPayload.ParseFromString(msg.payload)  # parse the payload into the payload object
-        if tokens[2] == "NCMD":  # if the message is a node command
-            for metric in inboundPayload.metrics:
-                if metric.name == "Node Control/Next Server":
-                    print("'Node Control/Next Server' is not implemented in this example")
-                elif metric.name == "Node Control/Rebirth":
-                    publishNodeBirth()
-                    print("Node has been reborn")
-                elif metric.name == "Node Control/Reboot":
-                    print("Node is going to reboot")
-                    try:
-                        os.system('sudo reboot')  # uncomment for Raspberry Pi
-                    except:
-                        print("Node reboot failed")
-                elif metric.name == "bdSeq":
-                    pass
-                else:
-                    print("Unknown command: " + metric.name)
-        elif tokens[2] == "DCMD" and tokens[
-            4] == myDeviceName:  # if the message is a device command and for this device
-            for metric in inboundPayload.metrics:  # iterate through the metrics
-                if metric.name == "Device Status":
-                    if metric.string_value == "start":
-                        print("Starting of the Device program")
-                        os.system("python3 ./Device_client.py")  # uncomment for Raspberry Pi
-
-        elif tokens[2] in ("DBIRTH", "DDEATH") and tokens[
-            4] == myDeviceName:  # if the message is a device birth or death
-            global dBirthTime, dDeathTime, device_online
-            if tokens[2] == "DBIRTH":
-                # print("Device Birth Certificate has been received")
-                dBirthTime = inboundPayload.timestamp
-
-            elif tokens[2] == "DDEATH":
-                # print("Device Death Certificate has been received")
-                dDeathTime = inboundPayload.timestamp
-
-            if all(var in globals().keys() for var in
-                   ['dBirthTime', 'dDeathTime']):  # if both birth and death certificates have been received
-                if dDeathTime > dBirthTime:  # if the death certificate is after the birth certificate
-                    device_online = False
-                else:
-                    device_online = True
+    # Check if the message is intended for this device
+    if tokens[0] == userdata["spBv"] and tokens[1] == userdata["myGroupId"]:
+        handle_node_message(tokens, msg, userdata)
     else:
-        print("Unknown command...")
+        logging.warning("Unknown command received: %s", msg.topic)
 
 
-def disconnect(client, rc):
-    deathPayload = sparkplug.getNodeDeathPayload()
-    deathByteArray = deathPayload.SerializeToString()
-    client.publish("spBv1.0/" + myGroupId + "/NDEATH/" + myNodeName, deathByteArray, qos, ret)
-    print("Disconnected with Result Code: {}".format(rc))
-    client.disconnect()
+def handle_node_message(tokens, msg, userdata):
+    if tokens[3] == userdata["myNodeName"]:
+        if tokens[2] == "NCMD":
+            handle_node_command(msg, userdata)
+        elif tokens[2] in ["DBIRTH", "DDEATH"]:
+            handle_device_life_cycle(msg, tokens[2], userdata)
+        elif tokens[2] == "DCMD" and tokens[4] == userdata["myDeviceName"]:
+            handle_device_command(msg, userdata)
+    else:
+        logging.warning("Unhandled node message type: %s", "/".join(tokens))
+
+
+def handle_node_command(msg, userdata):
+    inboundPayload = sparkplug_b_pb2.Payload()
+    try:
+        inboundPayload.ParseFromString(msg.payload)
+    except Exception as e:
+        logging.error("Failed to parse inbound payload: %s", e)
+        return
+
+    for metric in inboundPayload.metrics:
+        process_node_command_metric(metric, userdata)
+
+
+def process_node_command_metric(metric, userdata):
+    if metric.name == "Node Control/Rebirth":
+        logging.info("Node rebirth command received.")
+        # TODO
+        userdata["publishNodeBirth"]()
+    elif metric.name == "Node Control/Reboot":
+        logging.info("Node reboot command received.")
+        try:
+            os.system("sudo reboot")  # Be cautious with system reboot commands
+        except Exception as e:
+            logging.error("Node reboot failed: %s", e)
+    elif metric.name == "bdSeq":
+        pass  # Placeholder for future command handling
+    else:
+        logging.warning("Unknown node command: %s", metric.name)
+
+
+def handle_device_life_cycle(msg, messageType, userdata):
+    logging.info("Device life cycle message received: %s", messageType)
+    inboundPayload = sparkplug_b_pb2.Payload()
+
+    try:
+        inboundPayload.ParseFromString(msg.payload)
+    except Exception as e:
+        logging.error("Failed to parse inbound payload for device life cycle: %s", e)
+        return
+
+    # 'dBirthTime' and 'dDeathTime' are used to track the device's life cycle status
+    if messageType == "DBIRTH":
+        userdata["dBirthTime"] = inboundPayload.timestamp
+        logging.info(
+            "Device birth certificate received at timestamp: %s", userdata["dBirthTime"]
+        )
+    elif messageType == "DDEATH":
+        userdata["dDeathTime"] = inboundPayload.timestamp
+        logging.info(
+            "Device death certificate received at timestamp: %s", userdata["dDeathTime"]
+        )
+
+    userdata["device_online"] = userdata["dBirthTime"] > userdata["dDeathTime"]
+
+
+def handle_device_command(msg, userdata):
+    inboundPayload = sparkplug_b_pb2.Payload()
+    try:
+        inboundPayload.ParseFromString(msg.payload)
+    except Exception as e:
+        logging.error("Failed to parse inbound payload for device command: %s", e)
+        return
+
+    for metric in inboundPayload.metrics:
+        process_device_command_metric(metric, userdata)
+
+
+def process_device_command_metric(metric, userdata):
+    if metric.name == "Device Control/Start":
+        logging.info("Start command received for the device.")
+        # Add your logic here to start the device or perform related actions
+    elif metric.name == "Device Control/Stop":
+        logging.info("Stop command received for the device.")
+        # Add your logic here to stop the device or perform related actions
+    else:
+        logging.warning("Unknown device command: %s", metric.name)
+
+
+def disconnect(client, userdata, rc):
+    if rc == 0:  # Assuming rc == 0 indicates a clean disconnect
+        try:
+            deathPayload = sparkplug.getNodeDeathPayload()
+            deathByteArray = deathPayload.SerializeToString()
+            topic = f"{userdata['spBv']}/{userdata['myGroupId']}/NDEATH/{userdata['myNodeName']}"
+            client.publish(topic, deathByteArray, userdata["QoS"], 1)
+            logging.info("Published node death message successfully.")
+        except Exception as e:
+            logging.error("Failed to publish node death message: %s", e)
+    else:
+        logging.warning("Disconnecting with non-clean result code: %s", rc)
+
+    try:
+        client.disconnect()
+        logging.info("Disconnected successfully.")
+    except Exception as e:
+        logging.error("Error during disconnect: %s", e)
 
 
 ######################################################################
 # Publish the NBIRTH certificate
 ######################################################################
-def publishNodeBirth():
-    print("Publishing Node Birth Certificate")
+def publishNodeBirth(client, config):
+    logging.info("Publishing Node Birth Certificate")
+    userdata = client.user_data_get()
+    userdata["stale_notice"] = True
 
-    # Create the node birth payload
-    payload = getNdata()
+    try:
+        # Create the node birth payload
+        payload = getNdata(config)
 
-    # Set up the Node Controls
-    addMetric(payload, "Node Control/Next Server", None, MetricDataType.Boolean, False)
-    addMetric(payload, "Node Control/Rebirth", None, MetricDataType.Boolean, False)
-    addMetric(payload, "Node Control/Reboot", None, MetricDataType.Boolean, False)
+        # Set up the Node Controls
+        addMetric(
+            payload, "Node Control/Next Server", None, MetricDataType.Boolean, False
+        )
+        addMetric(payload, "Node Control/Rebirth", None, MetricDataType.Boolean, False)
+        addMetric(payload, "Node Control/Reboot", None, MetricDataType.Boolean, False)
 
-    globals()['previous_Ndata'] = payload
-    # Publish the node birth certificate
-    totalByteArray = payload.SerializeToString()
-    client.publish("spBv1.0/" + myGroupId + "/NBIRTH/" + myNodeName, totalByteArray, qos, ret)
+        userdata["previous_Ndata"] = payload
 
-    print("Node Birth Certificate has been published")
+        # Serialize the payload for publishing
+        totalByteArray = payload.SerializeToString()
+        topic = f"{userdata['spBv']}/{userdata['myGroupId']}/NBIRTH/{userdata['myNodeName']}"
+        client.publish(topic, totalByteArray, userdata["QoS"], 1)
+
+        logging.info("Node Birth Certificate has been published")
+        userdata["stale"] = True
+
+    except Exception as e:
+        logging.error("Failed to publish Node Birth Certificate: %s", e)
 
 
 ######################################################################
 # Publish NDATA
 ######################################################################
-def publishNdata():
-    global previous_Ndata
-    payload = getNdata()
-    for i, metric in enumerate(payload.metrics):
-        if metric.name == "Node time":
-            continue
-        elif metric.name == "CNC IP" and metric.string_value != \
-                [met.string_value for met in previous_Ndata.metrics if met.name == metric.name][
-                    0]:  # look for matching metric
-            stale = False
-            print(f"Metric has changed:\n{metric}")
-            break
-        elif metric.name == "CNC status" and metric.boolean_value != \
-                [met.boolean_value for met in previous_Ndata.metrics if met.name == metric.name][
-                    0]:  # look for matching metric
-            stale = False
-            print(f"\nNode metric has changed:\n{metric}")
-            break
-        else:
-            stale = True
+def publishNdata(client):
 
-    if 'stale' in locals().keys() and not stale:
-        totalByteArray = payload.SerializeToString()
-        client.publish("spBv1.0/" + myGroupId + "/NDATA/" + myNodeName, totalByteArray, qos, ret)
-        previous_Ndata = payload
-        print("^Node Data has been published\n")
+    userdata = client.user_data_get()
+
+    (
+        logging.info("Attempting to publish Node data...")
+        if userdata["stale_notice"]
+        else 0
+    )
+
+    payload = getNdata(config)
+
+    # Improved metric comparison logic
+    for metric in payload.metrics:
+        if metric.name == "Node time":
+            continue  # Skip comparison for "Node time"
+
+        # Retrieve the corresponding previous metric, if it exists
+        if userdata["previous_Ndata"]:
+            previous_metric = next(
+                (
+                    met
+                    for met in userdata["previous_Ndata"].metrics
+                    if met.name == metric.name
+                ),
+                None,
+            )
+
+        # Compare and detect changes
+        if previous_metric:
+            if (
+                metric.HasField("string_value")
+                and metric.string_value != previous_metric.string_value
+            ):
+                userdata["stale"] = False
+                logging.info(f"Metric has changed: {metric}")
+                break
+            elif (
+                metric.HasField("boolean_value")
+                and metric.boolean_value != previous_metric.boolean_value
+            ):
+                userdata["stale"] = False
+                logging.info(f"\nNode metric has changed: {metric}")
+                break
+
+    if not userdata["stale"]:
+        try:
+            totalByteArray = payload.SerializeToString()
+            topic = (
+                f"{client['spBv']}/{client['myGroupId']}/NDATA/{client['myNodeName']}"
+            )
+            client.publish(topic, totalByteArray, client["QoS"], 1)
+            logging.info("^Node Data has been published\n")
+            userdata["previous_Ndata"] = payload
+            userdata["stale_notice"] = True
+            return payload
+        except Exception as e:
+            logging.error(f"Failed to publish Node data: {e}")
+    else:
+        userdata["stale"] = True
+        (
+            logging.info("Node data is stale. No publication necessary.")
+            if userdata["stale_notice"]
+            else 0
+        )
+        userdata["stale_notice"] = False
+
+    return None
 
 
 ######################################################################
 # Get NDATA
 ######################################################################
-def getNdata():
+def getNdata(config):
     payload = sparkplug_b_pb2.Payload()
+    # Current time as a float metric
     addMetric(payload, "Node time", None, MetricDataType.Float, time.time())
-    addMetric(payload, "CNC IP", None, MetricDataType.String, CNC_host)
-    global device_online
-    addMetric(payload, "CNC status", None, MetricDataType.Boolean, device_online)
+
+    # CNC IP address as a string metric
+    addMetric(payload, "CNC IP", None, MetricDataType.String, config["CNC IP"])
+
+    # CNC status (online/offline) as a boolean metric
+    addMetric(
+        payload, "CNC status", None, MetricDataType.Boolean, config["device_online"]
+    )
     return payload
 
 
-# read data specific to setup and machines
-# with open(r"C:\Users\pkoprov\PycharmProjects\Haas-Data-Collection\Node.config") as config: # uncomment for Windows
-with open("/home/pi/Haas-Data-Collection/Node.config") as config:  # uncomment for Raspberry Pi
-    mqttBroker = config.readline().split(" = ")[1].replace("\n", "")
-    myGroupId = config.readline().split(" = ")[1].replace("\n", "")
-    myNodeName = config.readline().split(" = ")[1].replace("\n", "")
-    myDeviceName = config.readline().split(" = ")[1].replace("\n", "")
-    CNC_host = config.readline().split(" = ")[1].replace("\n", "")
-    myUsername = config.readline().split(" = ")[1].replace("\n", "")
-    myPassword = config.readline().split(" = ")[1].replace("\n", "")
+def read_config(config_path="./Node.config"):
+    """Read configuration from the file and return it as a dictionary."""
+    config = {}
+    with open(config_path) as f:
+        for line in f:
+            key, value = line.strip().split(" = ")
+            config[key] = value
+    return config
 
-# Create the node death payload
-deathPayload = sparkplug.getNodeDeathPayload()
-deathPayload.metrics[0].is_historical = True
-deathByteArray = deathPayload.SerializeToString()
 
-# Start of main program - Set up the MQTT client connection
-qos = 2
-ret = True
-client = mqtt.Client(myNodeName, clean_session=True)
-client.on_connect = on_connect
-client.on_message = on_message
-client.username_pw_set(myUsername, myPassword)
-client.will_set("spBv1.0/" + myGroupId + "/NDEATH/" + myNodeName, deathByteArray, qos, ret)
-client.connect(mqttBroker, 1883, 60)
+def setup_mqtt_client(config, is_node=False):
+    """Setup MQTT client with user data from config."""
 
-# Short delay to allow connect callback to occur
-client.loop_start()
-port = 5051  # port number for the Telnet server
-time.sleep(1)
+    client_id = config["myNodeName"] if is_node else config["myDeviceName"]
+    client = mqtt.Client(
+        mqtt.CallbackAPIVersion.VERSION1, client_id, clean_session=True
+    )
 
-device_online = False  # set the device online flag
-# Publish Node birth certificate
-publishNodeBirth()
+    # Set username and password if provided in config
+    if "myUsername" in config and "myPassword" in config:
+        client.username_pw_set(config["myUsername"], config["myPassword"])
 
-device_NGC = threading.Thread(target=device_ping, args=(CNC_host, 1))  # thread for device pinging
-device_NGC.start()
-time.sleep(3)
+    # Set user data for use in callbacks
+    client.user_data_set(
+        {
+            "spBv": config["spBv"],
+            "myGroupId": config["myGroupId"],
+            "myNodeName": config["myNodeName"],
+            "myDeviceName": config["myDeviceName"],
+            "CNC_host": config["CNC_host"],
+            "newdeath": False,
+            "powerMeter": config.get("powerMeter", False) == "True",
+            "QoS": int(config["QoS"]),
+        }
+    )
 
-while True:
-    publishNdata()  # publish NDATA if it changes
+    if is_node:
+        deathPayload = sparkplug.getNodeDeathPayload()
+        deathPayload.metrics[0].is_historical = True
+        deathByteArray = deathPayload.SerializeToString()
+        userdata = client.user_data_get()
+        will_topic = f"{userdata['spBv']}/{userdata['myGroupId']}/NDEATH/{userdata['myNodeName']}"
+        client.will_set(
+            topic=will_topic, payload=deathByteArray, qos=userdata["QoS"], retain=True
+        )
+    return client
+
+
+if __name__ == "__main__":
+
+    start_device_program = "python3 ./MQTT_SpB/Device_client.py"
+    config = read_config()
+    config["device_online"] = False
+    config["dBirthTime"] = 0
+    config["dDeathTime"] = 0
+
+    client = setup_mqtt_client(config)
+
+    # Setup callbacks
+    client.on_message = on_message
+    client.on_connect = on_connect
+
+    # # Start of main program - Set up the MQTT client connection
+    client.connect(config["MQTT Broker IP"], 1883, 60)
+    client.loop_start()
+    time.sleep(0.1)
+
+    # Publish Node birth certificate
+    publishNodeBirth(client, config)
+
+    # device_ping(config)
+
+    while True:
+        publishNdata(client)  # publish NDATA if it changes
