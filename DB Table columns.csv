@@ -10,33 +10,11 @@
 ?Q301,Motion Time (total),str
 ?Q303,Last Cycle Time,str
 ?Q304,Previous Cycle Time,str
-?Q402,M30 Parts Counter #1 (resettable at control),int
-?Q403,M30 Parts Counter #2 (resettable at control),int
 ?Q500,Three-in-one (PROGRAM; Oxxxxx; STATUS; PARTS; xxxxx),str
 ?Q600 1064,Max axis load for X,float
 ?Q600 1065,Max axis load for Y,float
 ?Q600 1066,Max axis load for Z,float
 ?Q600 1098,Spindle load with Haas vector drive (read only),float
-?Q600 1801,Max recorded vibrations of tool 1,float
-?Q600 1802,Max recorded vibrations of tool 2,float
-?Q600 1803,Max recorded vibrations of tool 3,float
-?Q600 1804,Max recorded vibrations of tool 4,float
-?Q600 1805,Max recorded vibrations of tool 5,float
-?Q600 1806,Max recorded vibrations of tool 6,float
-?Q600 1807,Max recorded vibrations of tool 7,float
-?Q600 1808,Max recorded vibrations of tool 8,float
-?Q600 1809,Max recorded vibrations of tool 9,float
-?Q600 1810,Max recorded vibrations of tool 10,float
-?Q600 1811,Max recorded vibrations of tool 11,float
-?Q600 1812,Max recorded vibrations of tool 12,float
-?Q600 1813,Max recorded vibrations of tool 13,float
-?Q600 1814,Max recorded vibrations of tool 14,float
-?Q600 1815,Max recorded vibrations of tool 15,float
-?Q600 1816,Max recorded vibrations of tool 16,float
-?Q600 1817,Max recorded vibrations of tool 17,float
-?Q600 1818,Max recorded vibrations of tool 18,float
-?Q600 1819,Max recorded vibrations of tool 19,float
-?Q600 1820,Max recorded vibrations of tool 20,float
 ?Q600 3020,Power on timer (read only),int
 ?Q600 3021,Cycle start timer, int
 ?Q600 3022,Feed timer,int
@@ -47,8 +25,4 @@
 ?Q600 5021,Present machine coordinate position X,float
 ?Q600 5022,Present machine coordinate position Y,float
 ?Q600 5023,Present machine coordinate position Z,float
-?Q600 5041,Present work coordinate position X,float
-?Q600 5042,Present work coordinate position Y,float
-?Q600 5043,Present work coordinate position Z,float
-?Q600 8552,Maximum recorded vibrations,float
 ?Q600 13013,Coolant level,int
